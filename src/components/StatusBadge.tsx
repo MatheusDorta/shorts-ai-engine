@@ -48,6 +48,7 @@ const publishingTone: Record<PublishingStatus, Tone> = {
   publishing: "warn",
   published: "good",
   failed: "bad",
+  cancelled: "neutral",
 };
 
 export function PublishingStatusBadge({ status }: { status: PublishingStatus }) {

@@ -505,6 +505,7 @@ export type Database = {
         | "publishing"
         | "published"
         | "failed"
+        | "cancelled"
       source_type: "youtube" | "podcast" | "live_stream" | "upload" | "other"
     }
     CompositeTypes: {
@@ -658,6 +659,7 @@ export const Constants = {
         "publishing",
         "published",
         "failed",
+        "cancelled",
       ],
       source_type: ["youtube", "podcast", "live_stream", "upload", "other"],
     },

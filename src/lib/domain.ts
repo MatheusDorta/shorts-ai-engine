@@ -75,6 +75,7 @@ export const PUBLISHING_STATUSES: { value: PublishingStatus; label: string }[] =
   { value: "publishing", label: "Publishing" },
   { value: "published", label: "Published" },
   { value: "failed", label: "Failed" },
+  { value: "cancelled", label: "Cancelled" },
 ];
 
 export const publishingStatusLabel = (s: PublishingStatus) =>

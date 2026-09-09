@@ -117,6 +117,9 @@ function Content() {
       if (f.status === "published") {
         throw Error("Published can only be set after a real platform publishing response.");
       }
+      if (!f.youtube && !f.tiktok) {
+        throw Error("Select at least one platform before saving content.");
+      }
       const existing = id ? list.data?.find((item) => item.id === id) : undefined;
       const preserveSystemStatus =
         existing && (existing.status === "published" || existing.status === "failed");
@@ -199,6 +202,11 @@ function Content() {
     mutationFn: async () => {
       if (!scheduleFor) throw Error("Select content to schedule");
       if (!scheduleAt) throw Error("Scheduled time is required");
+      const target = list.data?.find((x) => x.id === scheduleFor);
+      const allowedPlatforms = (target?.content_platforms ?? []).map((p) => p.platform as Platform);
+      if (!allowedPlatforms.includes(schedulePlatform)) {
+        throw Error("Selected platform is not part of this content.");
+      }
       return scheduleContent(scheduleFor, schedulePlatform, new Date(scheduleAt).toISOString());
     },
     onSuccess: () => {
@@ -454,11 +462,8 @@ function Content() {
                         </option>
                       ))
                     : [
-                        <option key="youtube_shorts" value="youtube_shorts">
-                          YouTube Shorts
-                        </option>,
-                        <option key="tiktok" value="tiktok">
-                          TikTok
+                        <option key="no-platforms" value="" disabled>
+                          No platforms selected — edit content first
                         </option>,
                       ]}
                 </select>
@@ -471,7 +476,7 @@ function Content() {
                   <Button
                     type="button"
                     size="sm"
-                    disabled={schedule.isPending}
+                    disabled={schedule.isPending || !x.content_platforms.length}
                     onClick={() => schedule.mutate()}
                   >
                     Confirm schedule

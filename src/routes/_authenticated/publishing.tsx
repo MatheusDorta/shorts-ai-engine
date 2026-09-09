@@ -13,10 +13,11 @@ import { cancelPublishingJob, retryPublishingJob } from "@/lib/workflow";
 
 export const Route = createFileRoute("/_authenticated/publishing")({ component: Publishing });
 
-const QUEUE_TABS: { key: "scheduled" | "waiting" | "failed"; label: string }[] = [
+const QUEUE_TABS: { key: "scheduled" | "waiting" | "failed" | "cancelled"; label: string }[] = [
   { key: "scheduled", label: "Scheduled" },
   { key: "waiting", label: "Waiting" },
   { key: "failed", label: "Failed" },
+  { key: "cancelled", label: "Cancelled" },
 ];
 
 function connectionLabel(platform: Platform) {
@@ -68,6 +69,7 @@ function Publishing() {
     scheduled: jobs.filter((x) => x.status === "scheduled").length,
     waiting: jobs.filter((x) => x.status === "waiting").length,
     failed: jobs.filter((x) => x.status === "failed").length,
+    cancelled: jobs.filter((x) => x.status === "cancelled").length,
   };
 
   return (
@@ -101,7 +103,9 @@ function Publishing() {
                 ? counts.scheduled
                 : tab.key === "waiting"
                   ? counts.waiting
-                  : counts.failed}
+                  : tab.key === "failed"
+                    ? counts.failed
+                    : counts.cancelled}
               )
             </h2>
             {items.map((x) => (
