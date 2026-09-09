@@ -10,33 +10,154 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
+import { Route as AuthRouteImport } from './routes/auth'
+import { Route as AuthenticatedAffiliatesRouteImport } from './routes/_authenticated/affiliates'
+import { Route as AuthenticatedAnalyticsRouteImport } from './routes/_authenticated/analytics'
+import { Route as AuthenticatedApprovalRouteImport } from './routes/_authenticated/approval'
+import { Route as AuthenticatedContentRouteImport } from './routes/_authenticated/content'
+import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as AuthenticatedPublishingRouteImport } from './routes/_authenticated/publishing'
+import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
+import { Route as AuthenticatedSourcesRouteImport } from './routes/_authenticated/sources'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
+  id: '/_authenticated',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedAffiliatesRoute = AuthenticatedAffiliatesRouteImport.update({
+  id: '/affiliates',
+  path: '/affiliates',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedAnalyticsRoute = AuthenticatedAnalyticsRouteImport.update({
+  id: '/analytics',
+  path: '/analytics',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedApprovalRoute = AuthenticatedApprovalRouteImport.update({
+  id: '/approval',
+  path: '/approval',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedContentRoute = AuthenticatedContentRouteImport.update({
+  id: '/content',
+  path: '/content',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedPublishingRoute = AuthenticatedPublishingRouteImport.update({
+  id: '/publishing',
+  path: '/publishing',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedSourcesRoute = AuthenticatedSourcesRouteImport.update({
+  id: '/sources',
+  path: '/sources',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
+  '/affiliates': typeof AuthenticatedAffiliatesRoute
+  '/analytics': typeof AuthenticatedAnalyticsRoute
+  '/approval': typeof AuthenticatedApprovalRoute
+  '/content': typeof AuthenticatedContentRoute
+  '/dashboard': typeof AuthenticatedDashboardRoute
+  '/publishing': typeof AuthenticatedPublishingRoute
+  '/settings': typeof AuthenticatedSettingsRoute
+  '/sources': typeof AuthenticatedSourcesRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
+  '/affiliates': typeof AuthenticatedAffiliatesRoute
+  '/analytics': typeof AuthenticatedAnalyticsRoute
+  '/approval': typeof AuthenticatedApprovalRoute
+  '/content': typeof AuthenticatedContentRoute
+  '/dashboard': typeof AuthenticatedDashboardRoute
+  '/publishing': typeof AuthenticatedPublishingRoute
+  '/settings': typeof AuthenticatedSettingsRoute
+  '/sources': typeof AuthenticatedSourcesRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
+  '/auth': typeof AuthRoute
+  '/_authenticated/affiliates': typeof AuthenticatedAffiliatesRoute
+  '/_authenticated/analytics': typeof AuthenticatedAnalyticsRoute
+  '/_authenticated/approval': typeof AuthenticatedApprovalRoute
+  '/_authenticated/content': typeof AuthenticatedContentRoute
+  '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_authenticated/publishing': typeof AuthenticatedPublishingRoute
+  '/_authenticated/settings': typeof AuthenticatedSettingsRoute
+  '/_authenticated/sources': typeof AuthenticatedSourcesRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/auth'
+    | '/affiliates'
+    | '/analytics'
+    | '/approval'
+    | '/content'
+    | '/dashboard'
+    | '/publishing'
+    | '/settings'
+    | '/sources'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/auth'
+    | '/affiliates'
+    | '/analytics'
+    | '/approval'
+    | '/content'
+    | '/dashboard'
+    | '/publishing'
+    | '/settings'
+    | '/sources'
+  id:
+    | '__root__'
+    | '/'
+    | '/_authenticated'
+    | '/auth'
+    | '/_authenticated/affiliates'
+    | '/_authenticated/analytics'
+    | '/_authenticated/approval'
+    | '/_authenticated/content'
+    | '/_authenticated/dashboard'
+    | '/_authenticated/publishing'
+    | '/_authenticated/settings'
+    | '/_authenticated/sources'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
+  AuthRoute: typeof AuthRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +169,108 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated': {
+      id: '/_authenticated'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthenticatedRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/affiliates': {
+      id: '/_authenticated/affiliates'
+      path: '/affiliates'
+      fullPath: '/affiliates'
+      preLoaderRoute: typeof AuthenticatedAffiliatesRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/analytics': {
+      id: '/_authenticated/analytics'
+      path: '/analytics'
+      fullPath: '/analytics'
+      preLoaderRoute: typeof AuthenticatedAnalyticsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/approval': {
+      id: '/_authenticated/approval'
+      path: '/approval'
+      fullPath: '/approval'
+      preLoaderRoute: typeof AuthenticatedApprovalRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/content': {
+      id: '/_authenticated/content'
+      path: '/content'
+      fullPath: '/content'
+      preLoaderRoute: typeof AuthenticatedContentRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/dashboard': {
+      id: '/_authenticated/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof AuthenticatedDashboardRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/publishing': {
+      id: '/_authenticated/publishing'
+      path: '/publishing'
+      fullPath: '/publishing'
+      preLoaderRoute: typeof AuthenticatedPublishingRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/settings': {
+      id: '/_authenticated/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof AuthenticatedSettingsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/sources': {
+      id: '/_authenticated/sources'
+      path: '/sources'
+      fullPath: '/sources'
+      preLoaderRoute: typeof AuthenticatedSourcesRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
   }
 }
 
+interface AuthenticatedRouteRouteChildren {
+  AuthenticatedAffiliatesRoute: typeof AuthenticatedAffiliatesRoute
+  AuthenticatedAnalyticsRoute: typeof AuthenticatedAnalyticsRoute
+  AuthenticatedApprovalRoute: typeof AuthenticatedApprovalRoute
+  AuthenticatedContentRoute: typeof AuthenticatedContentRoute
+  AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedPublishingRoute: typeof AuthenticatedPublishingRoute
+  AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
+  AuthenticatedSourcesRoute: typeof AuthenticatedSourcesRoute
+}
+
+const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedAffiliatesRoute: AuthenticatedAffiliatesRoute,
+  AuthenticatedAnalyticsRoute: AuthenticatedAnalyticsRoute,
+  AuthenticatedApprovalRoute: AuthenticatedApprovalRoute,
+  AuthenticatedContentRoute: AuthenticatedContentRoute,
+  AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedPublishingRoute: AuthenticatedPublishingRoute,
+  AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
+  AuthenticatedSourcesRoute: AuthenticatedSourcesRoute,
+}
+
+const AuthenticatedRouteRouteWithChildren =
+  AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
+  AuthRoute: AuthRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

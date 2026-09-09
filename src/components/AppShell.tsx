@@ -24,10 +24,10 @@ const NAV = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/sources", label: "Sources", icon: Library },
   { to: "/content", label: "Content", icon: FileVideo },
-  { to: "/approval-queue", label: "Approval Queue", icon: CheckSquare },
-  { to: "/publishing-queue", label: "Publishing Queue", icon: Send },
+  { to: "/approval", label: "Approval Queue", icon: CheckSquare },
+  { to: "/publishing", label: "Publishing Queue", icon: Send },
   { to: "/analytics", label: "Analytics", icon: BarChart3 },
-  { to: "/affiliate-links", label: "Affiliate Links", icon: Link2 },
+  { to: "/affiliates", label: "Affiliate Links", icon: Link2 },
   { to: "/settings", label: "Settings", icon: Settings },
 ] as const;
 
