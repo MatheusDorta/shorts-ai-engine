@@ -17,8 +17,7 @@ export const PLATFORMS: { value: Platform; label: string }[] = [
   { value: "tiktok", label: "TikTok" },
 ];
 
-export const platformLabel = (p: Platform) =>
-  PLATFORMS.find((x) => x.value === p)?.label ?? p;
+export const platformLabel = (p: Platform) => PLATFORMS.find((x) => x.value === p)?.label ?? p;
 
 export const SOURCE_TYPES: { value: SourceType; label: string }[] = [
   { value: "youtube", label: "YouTube" },
@@ -56,6 +55,15 @@ export const CONTENT_STATUSES: { value: ContentStatus; label: string }[] = [
   { value: "scheduled", label: "Scheduled" },
   { value: "published", label: "Published" },
   { value: "failed", label: "Failed" },
+];
+
+export const MANUAL_CONTENT_STATUSES: ContentStatus[] = [
+  "draft",
+  "processing",
+  "ready_for_review",
+  "approved",
+  "rejected",
+  "scheduled",
 ];
 
 export const contentStatusLabel = (s: ContentStatus) =>

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { EmptyState } from "@/components/EmptyState";
+import { PageError, PageLoading } from "@/components/QueryState";
 export const Route = createFileRoute("/_authenticated/affiliates")({ component: Affiliates });
 const blank = {
   company: "",
@@ -69,6 +70,7 @@ function Affiliates() {
       qc.invalidateQueries({ queryKey: ["affiliates"] });
       toast.success("Affiliate link deleted");
     },
+    onError: (e) => toast.error("Could not delete link", { description: e.message }),
   });
   const set = (k: keyof typeof blank, v: string | boolean) => setForm((x) => ({ ...x, [k]: v }));
   return (
@@ -144,6 +146,8 @@ function Affiliates() {
           )}
         </div>
       </form>
+      {q.isLoading && <PageLoading />}
+      {q.isError && <PageError error={q.error} onRetry={() => q.refetch()} />}
       <div className="space-y-3">
         {q.data?.map((x) => (
           <article className="surface-panel flex justify-between gap-3 rounded-xl p-4" key={x.id}>

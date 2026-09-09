@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { EmptyState } from "@/components/EmptyState";
+import { PageError, PageLoading } from "@/components/QueryState";
 import { Library } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/sources")({ component: Sources });
@@ -106,10 +107,12 @@ function Sources() {
         <select
           className="rounded-md border bg-background p-2"
           value={form.source_type}
-          onChange={(e) => update("source_type", e.target.value)}
+          onChange={(e) => update("source_type", e.target.value as SourceForm["source_type"])}
         >
           {["youtube", "podcast", "live_stream", "upload", "other"].map((x) => (
-            <option key={x}>{x}</option>
+            <option key={x} value={x}>
+              {x.replaceAll("_", " ")}
+            </option>
           ))}
         </select>
         <Input
@@ -120,11 +123,15 @@ function Sources() {
         <select
           className="rounded-md border bg-background p-2"
           value={form.permission_status}
-          onChange={(e) => update("permission_status", e.target.value)}
+          onChange={(e) =>
+            update("permission_status", e.target.value as SourceForm["permission_status"])
+          }
         >
           {["confirmed_permission", "licensed", "own_content", "unknown", "not_allowed"].map(
             (x) => (
-              <option key={x}>{x.replaceAll("_", " ")}</option>
+              <option key={x} value={x}>
+                {x.replaceAll("_", " ")}
+              </option>
             ),
           )}
         </select>
@@ -149,6 +156,8 @@ function Sources() {
           )}
         </div>
       </form>
+      {sources.isLoading && <PageLoading />}
+      {sources.isError && <PageError error={sources.error} onRetry={() => sources.refetch()} />}
       <div className="space-y-3">
         {sources.data?.map((s) => (
           <article

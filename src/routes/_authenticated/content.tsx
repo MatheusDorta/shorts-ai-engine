@@ -8,7 +8,21 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { EmptyState } from "@/components/EmptyState";
+import { MediaUploader } from "@/components/MediaUploader";
+import { PageError, PageLoading } from "@/components/QueryState";
+import { ContentStatusBadge, PermissionBadge } from "@/components/StatusBadge";
+import { useSession } from "@/hooks/useSession";
+import {
+  MANUAL_CONTENT_STATUSES,
+  contentStatusLabel,
+  type ContentStatus,
+  type Platform,
+} from "@/lib/domain";
+import { isManualContentStatus, scheduleContent } from "@/lib/workflow";
+import { deleteMedia } from "@/lib/media-upload";
+
 export const Route = createFileRoute("/_authenticated/content")({ component: Content });
+
 const blank = {
   title: "",
   description: "",
@@ -19,15 +33,24 @@ const blank = {
   hashtags: "",
   cta: "",
   notes: "",
-  status: "draft",
+  status: "draft" as ContentStatus,
   scheduled_at: "",
+  video_path: null as string | null,
+  thumbnail_path: null as string | null,
+  duration_seconds: null as number | null,
   youtube: true,
   tiktok: false,
 };
+
 function Content() {
   const qc = useQueryClient();
+  const { user } = useSession();
   const [f, setF] = useState(blank);
   const [id, setId] = useState<string | null>(null);
+  const [scheduleFor, setScheduleFor] = useState<string | null>(null);
+  const [schedulePlatform, setSchedulePlatform] = useState<Platform>("youtube_shorts");
+  const [scheduleAt, setScheduleAt] = useState("");
+
   const sources = useQuery({
     queryKey: ["sources"],
     queryFn: async () => {
@@ -55,17 +78,55 @@ function Content() {
       return r.data;
     },
   });
+
+  const persistPaths = useMutation({
+    mutationFn: async (patch: {
+      contentId: string;
+      video_path?: string | null;
+      thumbnail_path?: string | null;
+      duration_seconds?: number | null;
+    }) => {
+      const r = await supabase
+        .from("content")
+        .update({
+          ...(patch.video_path !== undefined ? { video_path: patch.video_path } : {}),
+          ...(patch.thumbnail_path !== undefined ? { thumbnail_path: patch.thumbnail_path } : {}),
+          ...(patch.duration_seconds !== undefined
+            ? { duration_seconds: patch.duration_seconds }
+            : {}),
+        })
+        .eq("id", patch.contentId);
+      if (r.error) throw r.error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["content"] });
+    },
+    onError: (e) => toast.error("Could not save media path", { description: e.message }),
+  });
+
   const save = useMutation({
     mutationFn: async () => {
       const {
-        data: { user },
+        data: { user: authUser },
       } = await supabase.auth.getUser();
-      if (!user) throw Error("Sign in required");
+      if (!authUser) throw Error("Sign in required");
       const source = sources.data?.find((x) => x.id === f.source_id);
-      if (source?.permission_status === "not_allowed")
+      if (source?.permission_status === "not_allowed") {
         throw Error("Content cannot use a source marked not allowed.");
+      }
+      if (f.status === "published") {
+        throw Error("Published can only be set after a real platform publishing response.");
+      }
+      const existing = id ? list.data?.find((item) => item.id === id) : undefined;
+      const preserveSystemStatus =
+        existing && (existing.status === "published" || existing.status === "failed");
+      const status: ContentStatus = preserveSystemStatus
+        ? existing.status
+        : isManualContentStatus(f.status)
+          ? f.status
+          : "draft";
       const p = {
-        user_id: user.id,
+        user_id: authUser.id,
         title: f.title,
         description: f.description || null,
         source_id: f.source_id || null,
@@ -78,8 +139,11 @@ function Content() {
           .filter(Boolean),
         cta: f.cta || null,
         notes: f.notes || null,
-        status: f.status as "draft",
         scheduled_at: f.scheduled_at || null,
+        video_path: f.video_path,
+        thumbnail_path: f.thumbnail_path,
+        duration_seconds: f.duration_seconds,
+        ...(preserveSystemStatus ? {} : { status }),
       };
       let contentId = id;
       if (id) {
@@ -94,34 +158,63 @@ function Content() {
       const rows = [f.youtube && "youtube_shorts", f.tiktok && "tiktok"]
         .filter(Boolean)
         .map((platform) => ({
-          user_id: user.id,
+          user_id: authUser.id,
           content_id: contentId!,
-          platform: platform as "youtube_shorts" | "tiktok",
+          platform: platform as Platform,
         }));
       if (rows.length) {
         const r = await supabase.from("content_platforms").insert(rows);
         if (r.error) throw r.error;
       }
+      return contentId;
     },
-    onSuccess: () => {
+    onSuccess: (contentId) => {
+      if (contentId) setId(contentId);
       qc.invalidateQueries({ queryKey: ["content"] });
-      setF(blank);
-      setId(null);
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
       toast.success("Content saved");
     },
     onError: (e) => toast.error("Could not save content", { description: e.message }),
   });
+
   const del = useMutation({
-    mutationFn: async (x: string) => {
-      const r = await supabase.from("content").delete().eq("id", x);
+    mutationFn: async (item: {
+      id: string;
+      video_path: string | null;
+      thumbnail_path: string | null;
+    }) => {
+      await deleteMedia(item.video_path).catch(() => undefined);
+      await deleteMedia(item.thumbnail_path).catch(() => undefined);
+      const r = await supabase.from("content").delete().eq("id", item.id);
       if (r.error) throw r.error;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["content"] });
       toast.success("Content deleted");
     },
+    onError: (e) => toast.error("Could not delete content", { description: e.message }),
   });
-  const set = (k: keyof typeof blank, v: string | boolean) => setF((x) => ({ ...x, [k]: v }));
+
+  const schedule = useMutation({
+    mutationFn: async () => {
+      if (!scheduleFor) throw Error("Select content to schedule");
+      if (!scheduleAt) throw Error("Scheduled time is required");
+      return scheduleContent(scheduleFor, schedulePlatform, new Date(scheduleAt).toISOString());
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["content"] });
+      qc.invalidateQueries({ queryKey: ["jobs"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      setScheduleFor(null);
+      setScheduleAt("");
+      toast.success("Locally scheduled. Platform not connected — nothing was published.");
+    },
+    onError: (e) => toast.error("Could not schedule content", { description: e.message }),
+  });
+
+  const set = (k: keyof typeof blank, v: (typeof blank)[keyof typeof blank]) =>
+    setF((x) => ({ ...x, [k]: v }));
+
   return (
     <div className="space-y-8">
       <div>
@@ -180,20 +273,17 @@ function Content() {
         </select>
         <select
           className="rounded-md border bg-background p-2"
-          value={f.status}
-          onChange={(e) => set("status", e.target.value)}
+          value={isManualContentStatus(f.status) ? f.status : f.status}
+          disabled={f.status === "published" || f.status === "failed"}
+          onChange={(e) => set("status", e.target.value as ContentStatus)}
         >
-          {[
-            "draft",
-            "processing",
-            "ready_for_review",
-            "approved",
-            "rejected",
-            "scheduled",
-            "published",
-            "failed",
-          ].map((x) => (
-            <option key={x}>{x.replaceAll("_", " ")}</option>
+          {(f.status === "published" || f.status === "failed"
+            ? ([f.status] as ContentStatus[])
+            : MANUAL_CONTENT_STATUSES
+          ).map((x) => (
+            <option key={x} value={x}>
+              {contentStatusLabel(x)}
+            </option>
           ))}
         </select>
         <Textarea
@@ -222,6 +312,39 @@ function Content() {
           />{" "}
           TikTok
         </label>
+        <div className="md:col-span-2 grid gap-3 md:grid-cols-2">
+          <MediaUploader
+            label="Video"
+            kind="videos"
+            userId={user?.id ?? null}
+            contentId={id}
+            path={f.video_path}
+            onDuration={(seconds) => {
+              set("duration_seconds", seconds);
+              if (id) persistPaths.mutate({ contentId: id, duration_seconds: seconds });
+            }}
+            onPathChange={(path) => {
+              set("video_path", path);
+              if (id) persistPaths.mutate({ contentId: id, video_path: path });
+            }}
+          />
+          <MediaUploader
+            label="Thumbnail"
+            kind="thumbnails"
+            userId={user?.id ?? null}
+            contentId={id}
+            path={f.thumbnail_path}
+            onPathChange={(path) => {
+              set("thumbnail_path", path);
+              if (id) persistPaths.mutate({ contentId: id, thumbnail_path: path });
+            }}
+          />
+        </div>
+        {!id && (
+          <p className="md:col-span-2 text-sm text-muted-foreground">
+            Save the content item first, then upload video and thumbnail files.
+          </p>
+        )}
         <div className="flex gap-2">
           <Button disabled={save.isPending}>{id ? "Update" : "Create content"}</Button>
           {id && (
@@ -238,6 +361,8 @@ function Content() {
           )}
         </div>
       </form>
+      {list.isLoading && <PageLoading />}
+      {list.isError && <PageError error={list.error} onRetry={() => list.refetch()} />}
       <div className="space-y-3">
         {list.data?.map((x) => (
           <article
@@ -246,11 +371,15 @@ function Content() {
           >
             <div>
               <b>{x.title}</b>
-              <p className="text-sm text-muted-foreground">
-                {x.status} · {x.sources?.name || "No source"}
+              <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                <ContentStatusBadge status={x.status} />
+                <span>{x.sources?.name || "No source"}</span>
+                {x.sources?.permission_status && (
+                  <PermissionBadge status={x.sources.permission_status} />
+                )}
               </p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Button
                 size="sm"
                 variant="secondary"
@@ -268,6 +397,10 @@ function Content() {
                     cta: x.cta || "",
                     notes: x.notes || "",
                     status: x.status,
+                    scheduled_at: x.scheduled_at ? x.scheduled_at.slice(0, 16) : "",
+                    video_path: x.video_path,
+                    thumbnail_path: x.thumbnail_path,
+                    duration_seconds: x.duration_seconds,
                     youtube: x.content_platforms.some((p) => p.platform === "youtube_shorts"),
                     tiktok: x.content_platforms.some((p) => p.platform === "tiktok"),
                   });
@@ -275,10 +408,85 @@ function Content() {
               >
                 Edit
               </Button>
-              <Button size="sm" variant="destructive" onClick={() => del.mutate(x.id)}>
+              {(x.status === "approved" || x.status === "scheduled") && (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => {
+                    setScheduleFor(x.id);
+                    setSchedulePlatform(
+                      x.content_platforms[0]?.platform === "tiktok" ? "tiktok" : "youtube_shorts",
+                    );
+                    setScheduleAt(x.scheduled_at ? x.scheduled_at.slice(0, 16) : "");
+                  }}
+                >
+                  Schedule
+                </Button>
+              )}
+              <Button
+                size="sm"
+                variant="destructive"
+                onClick={() =>
+                  del.mutate({
+                    id: x.id,
+                    video_path: x.video_path,
+                    thumbnail_path: x.thumbnail_path,
+                  })
+                }
+              >
                 Delete
               </Button>
             </div>
+            {scheduleFor === x.id && (
+              <div className="w-full space-y-2 rounded-md border border-border p-3">
+                <p className="text-sm text-muted-foreground">
+                  Creates a local publishing job. YouTube and TikTok remain not connected.
+                </p>
+                <select
+                  className="rounded-md border bg-background p-2"
+                  value={schedulePlatform}
+                  onChange={(e) => setSchedulePlatform(e.target.value as Platform)}
+                >
+                  {x.content_platforms.length
+                    ? x.content_platforms.map((p) => (
+                        <option key={p.platform} value={p.platform}>
+                          {p.platform === "youtube_shorts" ? "YouTube Shorts" : "TikTok"}
+                        </option>
+                      ))
+                    : [
+                        <option key="youtube_shorts" value="youtube_shorts">
+                          YouTube Shorts
+                        </option>,
+                        <option key="tiktok" value="tiktok">
+                          TikTok
+                        </option>,
+                      ]}
+                </select>
+                <Input
+                  type="datetime-local"
+                  value={scheduleAt}
+                  onChange={(e) => setScheduleAt(e.target.value)}
+                />
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={schedule.isPending}
+                    onClick={() => schedule.mutate()}
+                  >
+                    Confirm schedule
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => setScheduleFor(null)}
+                  >
+                    Close
+                  </Button>
+                </div>
+              </div>
+            )}
           </article>
         ))}
         {!list.isLoading && !list.data?.length && (

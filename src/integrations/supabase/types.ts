@@ -456,7 +456,30 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      cancel_publishing_job: {
+        Args: { p_job_id: string }
+        Returns: Database["public"]["Tables"]["publishing_jobs"]["Row"]
+      }
+      retry_publishing_job: {
+        Args: { p_job_id: string }
+        Returns: Database["public"]["Tables"]["publishing_jobs"]["Row"]
+      }
+      review_content: {
+        Args: {
+          p_action: Database["public"]["Enums"]["approval_action_type"]
+          p_content_id: string
+          p_reason?: string | null
+        }
+        Returns: Database["public"]["Tables"]["content"]["Row"]
+      }
+      schedule_content: {
+        Args: {
+          p_content_id: string
+          p_platform: Database["public"]["Enums"]["platform"]
+          p_scheduled_at: string
+        }
+        Returns: Database["public"]["Tables"]["publishing_jobs"]["Row"]
+      }
     }
     Enums: {
       approval_action_type: "approved" | "rejected"
