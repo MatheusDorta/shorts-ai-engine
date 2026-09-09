@@ -152,7 +152,8 @@ function Content() {
       if (id) {
         const r = await supabase.from("content").update(p).eq("id", id);
         if (r.error) throw r.error;
-        await supabase.from("content_platforms").delete().eq("content_id", id);
+        const cleared = await supabase.from("content_platforms").delete().eq("content_id", id);
+        if (cleared.error) throw cleared.error;
       } else {
         const r = await supabase.from("content").insert(p).select("id").single();
         if (r.error) throw r.error;
@@ -202,10 +203,12 @@ function Content() {
     mutationFn: async () => {
       if (!scheduleFor) throw Error("Select content to schedule");
       if (!scheduleAt) throw Error("Scheduled time is required");
-      const target = list.data?.find((x) => x.id === scheduleFor);
-      const allowedPlatforms = (target?.content_platforms ?? []).map((p) => p.platform as Platform);
-      if (!allowedPlatforms.includes(schedulePlatform)) {
-        throw Error("Selected platform is not part of this content.");
+      const item = list.data?.find((x) => x.id === scheduleFor);
+      if (item?.sources?.permission_status === "not_allowed") {
+        throw Error("Content cannot use a source marked not allowed.");
+      }
+      if (!item?.content_platforms.some((p) => p.platform === schedulePlatform)) {
+        throw Error("platform is not selected for this content");
       }
       return scheduleContent(scheduleFor, schedulePlatform, new Date(scheduleAt).toISOString());
     },
@@ -416,21 +419,21 @@ function Content() {
               >
                 Edit
               </Button>
-              {(x.status === "approved" || x.status === "scheduled") && (
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={() => {
-                    setScheduleFor(x.id);
-                    setSchedulePlatform(
-                      x.content_platforms[0]?.platform === "tiktok" ? "tiktok" : "youtube_shorts",
-                    );
-                    setScheduleAt(x.scheduled_at ? x.scheduled_at.slice(0, 16) : "");
-                  }}
-                >
-                  Schedule
-                </Button>
-              )}
+              {(x.status === "approved" || x.status === "scheduled") &&
+                x.sources?.permission_status !== "not_allowed" && (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => {
+                      setScheduleFor(x.id);
+                      const firstPlatform = x.content_platforms[0]?.platform;
+                      if (firstPlatform) setSchedulePlatform(firstPlatform);
+                      setScheduleAt(x.scheduled_at ? x.scheduled_at.slice(0, 16) : "");
+                    }}
+                  >
+                    Schedule
+                  </Button>
+                )}
               <Button
                 size="sm"
                 variant="destructive"
@@ -450,23 +453,23 @@ function Content() {
                 <p className="text-sm text-muted-foreground">
                   Creates a local publishing job. YouTube and TikTok remain not connected.
                 </p>
-                <select
-                  className="rounded-md border bg-background p-2"
-                  value={schedulePlatform}
-                  onChange={(e) => setSchedulePlatform(e.target.value as Platform)}
-                >
-                  {x.content_platforms.length
-                    ? x.content_platforms.map((p) => (
-                        <option key={p.platform} value={p.platform}>
-                          {p.platform === "youtube_shorts" ? "YouTube Shorts" : "TikTok"}
-                        </option>
-                      ))
-                    : [
-                        <option key="no-platforms" value="" disabled>
-                          No platforms selected — edit content first
-                        </option>,
-                      ]}
-                </select>
+                {x.content_platforms.length ? (
+                  <select
+                    className="rounded-md border bg-background p-2"
+                    value={schedulePlatform}
+                    onChange={(e) => setSchedulePlatform(e.target.value as Platform)}
+                  >
+                    {x.content_platforms.map((p) => (
+                      <option key={p.platform} value={p.platform}>
+                        {p.platform === "youtube_shorts" ? "YouTube Shorts" : "TikTok"}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <p className="text-sm text-destructive">
+                    Select YouTube Shorts or TikTok on this content item before scheduling.
+                  </p>
+                )}
                 <Input
                   type="datetime-local"
                   value={scheduleAt}
