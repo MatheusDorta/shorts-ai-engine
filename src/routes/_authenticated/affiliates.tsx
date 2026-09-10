@@ -176,7 +176,12 @@ function Affiliates() {
               >
                 Edit
               </Button>
-              <Button size="sm" variant="destructive" onClick={() => del.mutate(x.id)}>
+              <Button
+                size="sm"
+                variant="destructive"
+                disabled={del.isPending}
+                onClick={() => del.mutate(x.id)}
+              >
                 Delete
               </Button>
             </div>

@@ -140,7 +140,7 @@ function Sources() {
           value={form.notes}
           onChange={(e) => update("notes", e.target.value)}
         />
-        <div className="md:col-span-2 flex gap-2">
+        <div className="flex gap-2 md:col-span-2">
           <Button disabled={save.isPending}>{editing ? "Update source" : "Add source"}</Button>
           {editing && (
             <Button
@@ -193,7 +193,12 @@ function Sources() {
               >
                 Edit
               </Button>
-              <Button variant="destructive" size="sm" onClick={() => remove.mutate(s.id)}>
+              <Button
+                variant="destructive"
+                size="sm"
+                disabled={remove.isPending}
+                onClick={() => remove.mutate(s.id)}
+              >
                 Delete
               </Button>
             </div>

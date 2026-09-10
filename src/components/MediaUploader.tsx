@@ -48,8 +48,12 @@ export function MediaUploader({
       .then((next) => {
         if (live) setUrl(next);
       })
-      .catch(() => {
-        if (live) setUrl(null);
+      .catch((error) => {
+        if (!live) return;
+        setUrl(null);
+        toast.error("Could not load media preview", {
+          description: error instanceof Error ? error.message : undefined,
+        });
       });
     return () => {
       live = false;
@@ -71,7 +75,11 @@ export function MediaUploader({
     try {
       const nextPath = await uploadMedia(userId, contentId, kind, file, setProgress);
       if (path) {
-        await deleteMedia(path).catch(() => undefined);
+        try {
+          await deleteMedia(path);
+        } catch {
+          toast.error("Uploaded the new file, but the previous file could not be removed.");
+        }
       }
       onPathChange(nextPath);
       toast.success(`${label} uploaded`);

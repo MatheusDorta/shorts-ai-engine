@@ -40,9 +40,16 @@ export function AppShell({ children }: { children: ReactNode }) {
   async function signOut() {
     await queryClient.cancelQueries();
     queryClient.clear();
-    const { error } = await supabase.auth.signOut();
-    if (error) {
-      toast.error("Could not sign out", { description: error.message });
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        toast.error("Could not sign out", { description: error.message });
+        return;
+      }
+    } catch (error) {
+      toast.error("Could not sign out", {
+        description: error instanceof Error ? error.message : undefined,
+      });
       return;
     }
     navigate({ to: "/auth", replace: true });

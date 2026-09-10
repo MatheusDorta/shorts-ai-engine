@@ -34,7 +34,10 @@ function MediaPreview({ path, kind }: { path: string | null; kind: "video" | "im
       live = false;
     };
   }, [path]);
-  if (!url) return null;
+  if (!path) return null;
+  if (!url) {
+    return <p className="mt-3 text-sm text-muted-foreground">Preview unavailable.</p>;
+  }
   if (kind === "video") {
     return <video className="mt-3 max-h-64 w-full rounded-md bg-black" src={url} controls />;
   }

@@ -1,5 +1,10 @@
 import { supabase } from "@/integrations/supabase/client";
 import { SIGNED_URL_TTL_SECONDS, STORAGE_BUCKET } from "@/lib/integrations-config";
+import {
+  formatMissingSupabaseConfig,
+  getSupabasePublicConfig,
+  SupabaseConfigError,
+} from "@/lib/supabase-env";
 
 export const MAX_VIDEO_BYTES = 500 * 1024 * 1024;
 export const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
@@ -27,9 +32,12 @@ export async function uploadMedia(
     throw new Error(`File is larger than the ${kind === "videos" ? "500 MB" : "10 MB"} limit.`);
   }
 
-  const supabaseUrl = import.meta.env["VITE_SUPABASE_URL"] as string | undefined;
-  const supabaseKey = import.meta.env["VITE_SUPABASE_PUBLISHABLE_KEY"] as string | undefined;
-  if (!supabaseUrl || !supabaseKey) throw new Error("Supabase is not configured.");
+  const config = getSupabasePublicConfig();
+  if (!config.ok) {
+    throw new SupabaseConfigError(formatMissingSupabaseConfig(config.missing));
+  }
+  const supabaseUrl = config.url;
+  const supabaseKey = config.publishableKey;
 
   const {
     data: { session },

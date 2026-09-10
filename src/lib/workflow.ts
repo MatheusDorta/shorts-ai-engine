@@ -1,9 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
-import { MANUAL_CONTENT_STATUSES, type ContentStatus, type Platform } from "@/lib/domain";
+import type { Platform } from "@/lib/domain";
 
-export function isManualContentStatus(status: string): status is ContentStatus {
-  return (MANUAL_CONTENT_STATUSES as string[]).includes(status);
-}
+export { isManualContentStatus } from "@/lib/workflow-rules";
 
 export async function reviewContent(
   contentId: string,

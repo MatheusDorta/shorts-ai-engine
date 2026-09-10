@@ -18,7 +18,14 @@ import {
   type ContentStatus,
   type Platform,
 } from "@/lib/domain";
-import { isManualContentStatus, scheduleContent } from "@/lib/workflow";
+import { scheduleContent } from "@/lib/workflow";
+import {
+  blocksManualPublishedStatus,
+  canScheduleContent,
+  hasSelectedPlatform,
+  isManualContentStatus,
+  isPlatformOnContent,
+} from "@/lib/workflow-rules";
 import { deleteMedia } from "@/lib/media-upload";
 
 export const Route = createFileRoute("/_authenticated/content")({ component: Content });
@@ -114,10 +121,10 @@ function Content() {
       if (source?.permission_status === "not_allowed") {
         throw Error("Content cannot use a source marked not allowed.");
       }
-      if (f.status === "published") {
+      if (blocksManualPublishedStatus(f.status)) {
         throw Error("Published can only be set after a real platform publishing response.");
       }
-      if (!f.youtube && !f.tiktok) {
+      if (!hasSelectedPlatform(f.youtube, f.tiktok)) {
         throw Error("Select at least one platform before saving content.");
       }
       const existing = id ? list.data?.find((item) => item.id === id) : undefined;
@@ -187,13 +194,30 @@ function Content() {
       video_path: string | null;
       thumbnail_path: string | null;
     }) => {
-      await deleteMedia(item.video_path).catch(() => undefined);
-      await deleteMedia(item.thumbnail_path).catch(() => undefined);
+      const mediaWarnings: string[] = [];
+      try {
+        await deleteMedia(item.video_path);
+      } catch {
+        if (item.video_path) mediaWarnings.push("video file");
+      }
+      try {
+        await deleteMedia(item.thumbnail_path);
+      } catch {
+        if (item.thumbnail_path) mediaWarnings.push("thumbnail file");
+      }
       const r = await supabase.from("content").delete().eq("id", item.id);
       if (r.error) throw r.error;
+      return mediaWarnings;
     },
-    onSuccess: () => {
+    onSuccess: (mediaWarnings) => {
       qc.invalidateQueries({ queryKey: ["content"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      if (mediaWarnings.length) {
+        toast.success("Content deleted", {
+          description: `Could not remove ${mediaWarnings.join(" and ")} from storage.`,
+        });
+        return;
+      }
       toast.success("Content deleted");
     },
     onError: (e) => toast.error("Could not delete content", { description: e.message }),
@@ -204,11 +228,16 @@ function Content() {
       if (!scheduleFor) throw Error("Select content to schedule");
       if (!scheduleAt) throw Error("Scheduled time is required");
       const item = list.data?.find((x) => x.id === scheduleFor);
-      if (item?.sources?.permission_status === "not_allowed") {
-        throw Error("Content cannot use a source marked not allowed.");
+      const scheduleCheck = canScheduleContent({
+        status: item?.status ?? "draft",
+        permissionStatus: item?.sources?.permission_status,
+        platforms: item?.content_platforms ?? [],
+      });
+      if (!scheduleCheck.allowed) {
+        throw Error(scheduleCheck.reason ?? "This content cannot be scheduled.");
       }
-      if (!item?.content_platforms.some((p) => p.platform === schedulePlatform)) {
-        throw Error("platform is not selected for this content");
+      if (!item || !isPlatformOnContent(item.content_platforms, schedulePlatform)) {
+        throw Error("Selected platform is not part of this content.");
       }
       return scheduleContent(scheduleFor, schedulePlatform, new Date(scheduleAt).toISOString());
     },
@@ -419,24 +448,29 @@ function Content() {
               >
                 Edit
               </Button>
-              {(x.status === "approved" || x.status === "scheduled") &&
-                x.sources?.permission_status !== "not_allowed" && (
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => {
-                      setScheduleFor(x.id);
-                      const firstPlatform = x.content_platforms[0]?.platform;
-                      if (firstPlatform) setSchedulePlatform(firstPlatform);
-                      setScheduleAt(x.scheduled_at ? x.scheduled_at.slice(0, 16) : "");
-                    }}
-                  >
-                    Schedule
-                  </Button>
-                )}
+              {canScheduleContent({
+                status: x.status,
+                permissionStatus: x.sources?.permission_status,
+                platforms: x.content_platforms,
+              }).allowed && (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  disabled={schedule.isPending}
+                  onClick={() => {
+                    setScheduleFor(x.id);
+                    const firstPlatform = x.content_platforms[0]?.platform;
+                    if (firstPlatform) setSchedulePlatform(firstPlatform);
+                    setScheduleAt(x.scheduled_at ? x.scheduled_at.slice(0, 16) : "");
+                  }}
+                >
+                  Schedule
+                </Button>
+              )}
               <Button
                 size="sm"
                 variant="destructive"
+                disabled={del.isPending}
                 onClick={() =>
                   del.mutate({
                     id: x.id,

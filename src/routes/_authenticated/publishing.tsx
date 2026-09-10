@@ -10,6 +10,7 @@ import { PublishingStatusBadge } from "@/components/StatusBadge";
 import { integrationConfig } from "@/lib/integrations-config";
 import { platformLabel, type Platform, type PublishingStatus } from "@/lib/domain";
 import { cancelPublishingJob, retryPublishingJob } from "@/lib/workflow";
+import { canCancelPublishingJob, canRetryPublishingJob } from "@/lib/workflow-rules";
 
 export const Route = createFileRoute("/_authenticated/publishing")({ component: Publishing });
 
@@ -153,8 +154,8 @@ function JobCard({
   onRetry: () => void;
   busy: boolean;
 }) {
-  const canCancel = job.status === "scheduled" || job.status === "waiting";
-  const canRetry = job.status === "failed";
+  const canCancel = canCancelPublishingJob(job.status);
+  const canRetry = canRetryPublishingJob(job.status);
   return (
     <article className="surface-panel flex flex-wrap justify-between gap-3 rounded-xl p-4">
       <div>
