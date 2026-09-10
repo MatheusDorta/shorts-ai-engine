@@ -478,6 +478,90 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      retry_publishing_job: {
+        Args: { p_job_id: string }
+        Returns: {
+          content_id: string
+          created_at: string
+          error_message: string | null
+          id: string
+          platform: Database["public"]["Enums"]["platform"]
+          published_at: string | null
+          result: string | null
+          scheduled_at: string | null
+          status: Database["public"]["Enums"]["publishing_status"]
+          updated_at: string
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "publishing_jobs"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      review_content: {
+        Args: {
+          p_action: Database["public"]["Enums"]["approval_action_type"]
+          p_content_id: string
+          p_reason?: string
+        }
+        Returns: {
+          affiliate_link_id: string | null
+          approved_at: string | null
+          approved_by: string | null
+          caption: string | null
+          created_at: string
+          cta: string | null
+          description: string | null
+          duration_seconds: number | null
+          hashtags: string[]
+          hook: string | null
+          id: string
+          notes: string | null
+          rejection_reason: string | null
+          scheduled_at: string | null
+          source_id: string | null
+          status: Database["public"]["Enums"]["content_status"]
+          thumbnail_path: string | null
+          title: string
+          updated_at: string
+          user_id: string
+          video_path: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "content"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      schedule_content: {
+        Args: {
+          p_content_id: string
+          p_platform: Database["public"]["Enums"]["platform"]
+          p_scheduled_at: string
+        }
+        Returns: {
+          content_id: string
+          created_at: string
+          error_message: string | null
+          id: string
+          platform: Database["public"]["Enums"]["platform"]
+          published_at: string | null
+          result: string | null
+          scheduled_at: string | null
+          status: Database["public"]["Enums"]["publishing_status"]
+          updated_at: string
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "publishing_jobs"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
     }
     Enums: {
       approval_action_type: "approved" | "rejected"
