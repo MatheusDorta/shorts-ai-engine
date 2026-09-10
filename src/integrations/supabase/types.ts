@@ -456,7 +456,28 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      cancel_publishing_job: {
+        Args: { p_job_id: string }
+        Returns: {
+          content_id: string
+          created_at: string
+          error_message: string | null
+          id: string
+          platform: Database["public"]["Enums"]["platform"]
+          published_at: string | null
+          result: string | null
+          scheduled_at: string | null
+          status: Database["public"]["Enums"]["publishing_status"]
+          updated_at: string
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "publishing_jobs"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
     }
     Enums: {
       approval_action_type: "approved" | "rejected"
@@ -482,6 +503,7 @@ export type Database = {
         | "publishing"
         | "published"
         | "failed"
+        | "cancelled"
       source_type: "youtube" | "podcast" | "live_stream" | "upload" | "other"
     }
     CompositeTypes: {
@@ -635,6 +657,7 @@ export const Constants = {
         "publishing",
         "published",
         "failed",
+        "cancelled",
       ],
       source_type: ["youtube", "podcast", "live_stream", "upload", "other"],
     },
