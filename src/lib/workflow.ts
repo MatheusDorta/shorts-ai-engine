@@ -13,7 +13,7 @@ export async function reviewContent(
   const { data, error } = await supabase.rpc("review_content", {
     p_content_id: contentId,
     p_action: action,
-    p_reason: action === "rejected" ? (reason ?? "").trim() : null,
+    p_reason: action === "rejected" ? (reason ?? "").trim() : undefined,
   });
   if (error) throw error;
   return data;
