@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/EmptyState";
 import { PageError, PageLoading } from "@/components/QueryState";
 import { PublishingStatusBadge } from "@/components/StatusBadge";
-import { integrationConfig } from "@/lib/integrations-config";
 import { platformLabel, type Platform, type PublishingStatus } from "@/lib/domain";
 import { cancelPublishingJob, retryPublishingJob } from "@/lib/workflow";
 import { canCancelPublishingJob, canRetryPublishingJob } from "@/lib/workflow-rules";
@@ -21,16 +20,27 @@ const QUEUE_TABS: { key: "scheduled" | "waiting" | "failed" | "cancelled"; label
   { key: "cancelled", label: "Cancelled" },
 ];
 
-function connectionLabel(platform: Platform) {
-  const configured =
-    platform === "youtube_shorts"
-      ? integrationConfig.youtube.configured
-      : integrationConfig.tiktok.configured;
-  return configured ? "Connected" : "NOT CONNECTED";
+function connectionLabel(
+  platform: Platform,
+  accounts: Array<{ platform: Platform; is_connected: boolean }> | undefined,
+) {
+  if (platform === "tiktok") return "NOT CONNECTED";
+  const account = accounts?.find((row) => row.platform === platform);
+  return account?.is_connected ? "Connected" : "NOT CONNECTED";
 }
 
 function Publishing() {
   const qc = useQueryClient();
+  const accounts = useQuery({
+    queryKey: ["platform-accounts"],
+    queryFn: async () => {
+      const r = await supabase
+        .from("platform_accounts")
+        .select("platform,is_connected,account_name");
+      if (r.error) throw r.error;
+      return r.data;
+    },
+  });
   const q = useQuery({
     queryKey: ["jobs"],
     queryFn: async () => {
@@ -78,18 +88,22 @@ function Publishing() {
       <div>
         <h1 className="text-2xl font-semibold">Publishing Queue</h1>
         <p className="text-muted-foreground">
-          Local queue only. YouTube Shorts and TikTok remain not connected until official OAuth is
-          added.
+          Local queue only. Connecting YouTube does not publish videos. TikTok remains not
+          connected.
         </p>
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="surface-panel rounded-xl p-4">
           <p className="text-sm font-medium">YouTube Shorts</p>
-          <p className="text-sm text-muted-foreground">{connectionLabel("youtube_shorts")}</p>
+          <p className="text-sm text-muted-foreground">
+            {connectionLabel("youtube_shorts", accounts.data ?? undefined)}
+          </p>
         </div>
         <div className="surface-panel rounded-xl p-4">
           <p className="text-sm font-medium">TikTok</p>
-          <p className="text-sm text-muted-foreground">{connectionLabel("tiktok")}</p>
+          <p className="text-sm text-muted-foreground">
+            {connectionLabel("tiktok", accounts.data ?? undefined)}
+          </p>
         </div>
       </div>
       {q.isLoading && <PageLoading />}
@@ -113,6 +127,7 @@ function Publishing() {
               <JobCard
                 key={x.id}
                 job={x}
+                connected={connectionLabel(x.platform, accounts.data ?? undefined) === "Connected"}
                 onCancel={() => cancel.mutate(x.id)}
                 onRetry={() => retry.mutate(x.id)}
                 busy={cancel.isPending || retry.isPending}
@@ -137,6 +152,7 @@ function Publishing() {
 
 function JobCard({
   job,
+  connected,
   onCancel,
   onRetry,
   busy,
@@ -150,6 +166,7 @@ function JobCard({
     error_message: string | null;
     content: { title: string } | null;
   };
+  connected: boolean;
   onCancel: () => void;
   onRetry: () => void;
   busy: boolean;
@@ -163,7 +180,7 @@ function JobCard({
         <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
           <span>{platformLabel(job.platform)}</span>
           <PublishingStatusBadge status={job.status} />
-          <span>NOT CONNECTED</span>
+          <span>{connected ? "Connected" : "NOT CONNECTED"}</span>
         </p>
         <p className="mt-1 text-sm text-muted-foreground">
           {job.scheduled_at ? new Date(job.scheduled_at).toLocaleString() : "No scheduled time"}

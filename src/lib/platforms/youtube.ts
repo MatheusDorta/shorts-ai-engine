@@ -4,10 +4,11 @@ import { notConfigured, type PlatformService } from "./types";
 const NAME = "YouTube Shorts";
 
 /**
- * YouTube Shorts service stub.
+ * YouTube Shorts publishing stub.
  *
- * Future implementation: YouTube Data API v3 (videos.insert) called from a
- * server function using an OAuth refresh token stored as a server secret.
+ * Phase 1 added server-side OAuth connection only. This service remains a stub
+ * until Phase 2 implements videos.insert. Do not treat a connected account as
+ * a live publishing integration.
  */
 export const youtubeService: PlatformService = {
   platform: "youtube_shorts",

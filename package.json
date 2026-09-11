@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "test": "node --experimental-strip-types --test src/lib/supabase-env.test.ts src/lib/auth-errors.test.ts src/lib/workflow-rules.test.ts",
+    "test": "node --experimental-strip-types --test src/lib/supabase-env.test.ts src/lib/auth-errors.test.ts src/lib/workflow-rules.test.ts src/lib/youtube/crypto.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "overrides": {
