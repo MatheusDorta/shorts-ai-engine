@@ -338,39 +338,6 @@ export type Database = {
         }
         Relationships: []
       }
-      platform_credentials: {
-        Row: {
-          created_at: string
-          encrypted_refresh_token: string
-          id: string
-          platform: Database["public"]["Enums"]["platform"]
-          token_expires_at: string | null
-          updated_at: string
-          user_id: string
-          youtube_channel_id: string | null
-        }
-        Insert: {
-          created_at?: string
-          encrypted_refresh_token: string
-          id?: string
-          platform: Database["public"]["Enums"]["platform"]
-          token_expires_at?: string | null
-          updated_at?: string
-          user_id: string
-          youtube_channel_id?: string | null
-        }
-        Update: {
-          created_at?: string
-          encrypted_refresh_token?: string
-          id?: string
-          platform?: Database["public"]["Enums"]["platform"]
-          token_expires_at?: string | null
-          updated_at?: string
-          user_id?: string
-          youtube_channel_id?: string | null
-        }
-        Relationships: []
-      }
       profiles: {
         Row: {
           created_at: string
