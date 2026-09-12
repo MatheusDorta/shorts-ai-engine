@@ -14,6 +14,7 @@
 4. Validar `/auth` e uma página protegida no preview, incluindo carregamento, login e ausência de erros no navegador.
 5. Conferir o resultado da compilação e publicar a correção no endereço atual.
 6. Abrir o `/auth` publicado em uma sessão nova e confirmar que o formulário de login aparece no lugar do aviso.
+7. COnfirmar um pente fino se esta tudo OK com a conexao ao banco de dados do SupaBase conectado ao projeto correto
 
 ## Limites de segurança
 
