@@ -13,6 +13,12 @@ export type ResolvedSupabasePublicConfig =
 const PLACEHOLDER_URLS = new Set(["https://your-project.supabase.co", "your-project.supabase.co"]);
 const PLACEHOLDER_KEYS = new Set(["your_publishable_key", "your-anon-key", "your_anon_key"]);
 
+// Public browser configuration for this project's existing Lovable Cloud backend.
+// These values identify the project but do not grant privileged access; database
+// access remains protected by authentication and row-level security.
+const MANAGED_PUBLIC_URL = "https://qpaqbamlpfneblgnjakl.supabase.co";
+const MANAGED_PUBLISHABLE_KEY = "sb_publishable_nf9tgYmegDuJzKFhCz0rAA_eeNXziXw";
+
 function clean(value: string | undefined): string | undefined {
   const trimmed = value?.trim();
   return trimmed ? trimmed : undefined;
@@ -82,8 +88,11 @@ function readProcessEnv(name: string): string | undefined {
 
 export function getSupabasePublicConfig(): ResolvedSupabasePublicConfig {
   return resolveSupabasePublicConfig({
-    viteUrl: import.meta.env["VITE_SUPABASE_URL"] as string | undefined,
-    viteKey: import.meta.env["VITE_SUPABASE_PUBLISHABLE_KEY"] as string | undefined,
+    viteUrl:
+      (import.meta.env["VITE_SUPABASE_URL"] as string | undefined) ?? MANAGED_PUBLIC_URL,
+    viteKey:
+      (import.meta.env["VITE_SUPABASE_PUBLISHABLE_KEY"] as string | undefined) ??
+      MANAGED_PUBLISHABLE_KEY,
     serverUrl: readProcessEnv("SUPABASE_URL"),
     serverKey: readProcessEnv("SUPABASE_PUBLISHABLE_KEY"),
   });
