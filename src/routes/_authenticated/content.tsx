@@ -21,12 +21,15 @@ import {
 import { scheduleContent } from "@/lib/workflow";
 import {
   blocksManualPublishedStatus,
+  canPublishYoutubeNow,
   canScheduleContent,
   hasSelectedPlatform,
+  isActivePublishingJob,
   isManualContentStatus,
   isPlatformOnContent,
 } from "@/lib/workflow-rules";
 import { deleteMedia } from "@/lib/media-upload";
+import { publishYoutubeNow } from "@/lib/youtube/youtube.functions";
 
 export const Route = createFileRoute("/_authenticated/content")({ component: Content });
 
@@ -81,6 +84,22 @@ function Content() {
         .from("content")
         .select("*,sources(name,permission_status),content_platforms(platform)")
         .order("created_at", { ascending: false });
+      if (r.error) throw r.error;
+      return r.data;
+    },
+  });
+  const accounts = useQuery({
+    queryKey: ["platform-accounts"],
+    queryFn: async () => {
+      const r = await supabase.from("platform_accounts").select("platform,is_connected");
+      if (r.error) throw r.error;
+      return r.data;
+    },
+  });
+  const jobs = useQuery({
+    queryKey: ["jobs", "publish-now-gate"],
+    queryFn: async () => {
+      const r = await supabase.from("publishing_jobs").select("id,content_id,platform,status");
       if (r.error) throw r.error;
       return r.data;
     },
@@ -247,9 +266,33 @@ function Content() {
       qc.invalidateQueries({ queryKey: ["dashboard"] });
       setScheduleFor(null);
       setScheduleAt("");
-      toast.success("Locally scheduled. Platform not connected — nothing was published.");
+      toast.success("Locally scheduled. Use Publish Now to upload privately to YouTube.");
     },
     onError: (e) => toast.error("Could not schedule content", { description: e.message }),
+  });
+
+  const youtubeConnected = Boolean(
+    accounts.data?.find((row) => row.platform === "youtube_shorts")?.is_connected,
+  );
+
+  const publishNow = useMutation({
+    mutationFn: async (contentId: string) => publishYoutubeNow({ data: { contentId } }),
+    onSuccess: (result) => {
+      qc.invalidateQueries({ queryKey: ["content"] });
+      qc.invalidateQueries({ queryKey: ["jobs"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      if (!result.ok) {
+        toast.error("Could not publish to YouTube", { description: result.message });
+        return;
+      }
+      toast.success("Published privately to YouTube", {
+        description: `${result.videoId} — ${result.videoUrl}`,
+      });
+    },
+    onError: (e) =>
+      toast.error("Could not publish to YouTube", {
+        description: e instanceof Error ? e.message : undefined,
+      }),
   });
 
   const set = (k: keyof typeof blank, v: (typeof blank)[keyof typeof blank]) =>
@@ -448,6 +491,29 @@ function Content() {
               >
                 Edit
               </Button>
+              {canPublishYoutubeNow({
+                youtubeConnected,
+                contentStatus: x.status,
+                permissionStatus: x.sources?.permission_status,
+                platforms: x.content_platforms,
+                hasVideo: Boolean(x.video_path),
+                activeJobExists: Boolean(
+                  jobs.data?.some(
+                    (job) =>
+                      job.content_id === x.id &&
+                      job.platform === "youtube_shorts" &&
+                      isActivePublishingJob(job.status),
+                  ),
+                ),
+              }).allowed && (
+                <Button
+                  size="sm"
+                  disabled={publishNow.isPending}
+                  onClick={() => publishNow.mutate(x.id)}
+                >
+                  Publish Now
+                </Button>
+              )}
               {canScheduleContent({
                 status: x.status,
                 permissionStatus: x.sources?.permission_status,
@@ -485,7 +551,7 @@ function Content() {
             {scheduleFor === x.id && (
               <div className="w-full space-y-2 rounded-md border border-border p-3">
                 <p className="text-sm text-muted-foreground">
-                  Creates a local publishing job. YouTube and TikTok remain not connected.
+                  Creates a local publishing job. Use Publish Now to upload privately to YouTube.
                 </p>
                 {x.content_platforms.length ? (
                   <select

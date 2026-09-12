@@ -7,15 +7,31 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/EmptyState";
 import { PageError, PageLoading } from "@/components/QueryState";
 import { PublishingStatusBadge } from "@/components/StatusBadge";
-import { platformLabel, type Platform, type PublishingStatus } from "@/lib/domain";
+import {
+  platformLabel,
+  type ContentStatus,
+  type PermissionStatus,
+  type Platform,
+  type PublishingStatus,
+} from "@/lib/domain";
 import { cancelPublishingJob, retryPublishingJob } from "@/lib/workflow";
-import { canCancelPublishingJob, canRetryPublishingJob } from "@/lib/workflow-rules";
+import {
+  canCancelPublishingJob,
+  canPublishYoutubeNow,
+  canRetryPublishingJob,
+} from "@/lib/workflow-rules";
+import { publishYoutubeNow } from "@/lib/youtube/youtube.functions";
 
 export const Route = createFileRoute("/_authenticated/publishing")({ component: Publishing });
 
-const QUEUE_TABS: { key: "scheduled" | "waiting" | "failed" | "cancelled"; label: string }[] = [
+const QUEUE_TABS: {
+  key: "scheduled" | "waiting" | "publishing" | "published" | "failed" | "cancelled";
+  label: string;
+}[] = [
   { key: "scheduled", label: "Scheduled" },
   { key: "waiting", label: "Waiting" },
+  { key: "publishing", label: "Publishing" },
+  { key: "published", label: "Published" },
   { key: "failed", label: "Failed" },
   { key: "cancelled", label: "Cancelled" },
 ];
@@ -46,19 +62,23 @@ function Publishing() {
     queryFn: async () => {
       const r = await supabase
         .from("publishing_jobs")
-        .select("*,content(title,video_path)")
+        .select("*,content(title,video_path,status,sources(permission_status))")
         .order("created_at", { ascending: false });
       if (r.error) throw r.error;
       return r.data;
     },
   });
 
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ["jobs"] });
+    qc.invalidateQueries({ queryKey: ["content"] });
+    qc.invalidateQueries({ queryKey: ["dashboard"] });
+  };
+
   const cancel = useMutation({
     mutationFn: async (id: string) => cancelPublishingJob(id),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["jobs"] });
-      qc.invalidateQueries({ queryKey: ["content"] });
-      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      invalidate();
       toast.success("Job cancelled locally");
     },
     onError: (e) => toast.error("Could not cancel job", { description: e.message }),
@@ -67,18 +87,39 @@ function Publishing() {
   const retry = useMutation({
     mutationFn: async (id: string) => retryPublishingJob(id),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["jobs"] });
-      qc.invalidateQueries({ queryKey: ["content"] });
-      qc.invalidateQueries({ queryKey: ["dashboard"] });
-      toast.success("Job retried locally. Platform not connected.");
+      invalidate();
+      toast.success("Job retried locally. Use Publish Now to upload to YouTube.");
     },
     onError: (e) => toast.error("Could not retry job", { description: e.message }),
   });
 
+  const publishNow = useMutation({
+    mutationFn: async (input: { contentId: string; jobId: string }) =>
+      publishYoutubeNow({ data: input }),
+    onSuccess: (result) => {
+      invalidate();
+      if (!result.ok) {
+        toast.error("Could not publish to YouTube", { description: result.message });
+        return;
+      }
+      toast.success("Published privately to YouTube", {
+        description: `${result.videoId} — ${result.videoUrl}`,
+      });
+    },
+    onError: (e) =>
+      toast.error("Could not publish to YouTube", {
+        description: e instanceof Error ? e.message : undefined,
+      }),
+  });
+
   const jobs = q.data ?? [];
+  const youtubeConnected =
+    connectionLabel("youtube_shorts", accounts.data ?? undefined) === "Connected";
   const counts = {
     scheduled: jobs.filter((x) => x.status === "scheduled").length,
     waiting: jobs.filter((x) => x.status === "waiting").length,
+    publishing: jobs.filter((x) => x.status === "publishing").length,
+    published: jobs.filter((x) => x.status === "published").length,
     failed: jobs.filter((x) => x.status === "failed").length,
     cancelled: jobs.filter((x) => x.status === "cancelled").length,
   };
@@ -88,8 +129,7 @@ function Publishing() {
       <div>
         <h1 className="text-2xl font-semibold">Publishing Queue</h1>
         <p className="text-muted-foreground">
-          Local queue only. Connecting YouTube does not publish videos. TikTok remains not
-          connected.
+          Publish Now uploads privately to YouTube. TikTok remains not connected.
         </p>
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
@@ -113,24 +153,17 @@ function Publishing() {
         return (
           <section key={tab.key} className="space-y-3">
             <h2 className="font-semibold">
-              {tab.label} (
-              {tab.key === "scheduled"
-                ? counts.scheduled
-                : tab.key === "waiting"
-                  ? counts.waiting
-                  : tab.key === "failed"
-                    ? counts.failed
-                    : counts.cancelled}
-              )
+              {tab.label} ({counts[tab.key]})
             </h2>
             {items.map((x) => (
               <JobCard
                 key={x.id}
                 job={x}
-                connected={connectionLabel(x.platform, accounts.data ?? undefined) === "Connected"}
+                youtubeConnected={youtubeConnected}
                 onCancel={() => cancel.mutate(x.id)}
                 onRetry={() => retry.mutate(x.id)}
-                busy={cancel.isPending || retry.isPending}
+                onPublishNow={() => publishNow.mutate({ contentId: x.content_id, jobId: x.id })}
+                busy={cancel.isPending || retry.isPending || publishNow.isPending}
               />
             ))}
             {!q.isLoading && !items.length && (
@@ -143,7 +176,7 @@ function Publishing() {
         <EmptyState
           icon={Send}
           title="No publishing jobs"
-          description="Schedule approved content to add a local queue job. Nothing is published externally."
+          description="Schedule approved content or use Publish Now to upload privately to YouTube."
         />
       )}
     </div>
@@ -152,27 +185,47 @@ function Publishing() {
 
 function JobCard({
   job,
-  connected,
+  youtubeConnected,
   onCancel,
   onRetry,
+  onPublishNow,
   busy,
 }: {
   job: {
     id: string;
+    content_id: string;
     platform: Platform;
     status: PublishingStatus;
     scheduled_at: string | null;
     result: string | null;
     error_message: string | null;
-    content: { title: string } | null;
+    remote_id: string | null;
+    remote_url: string | null;
+    content: {
+      title: string;
+      video_path: string | null;
+      status: ContentStatus;
+      sources: { permission_status: PermissionStatus | null } | null;
+    } | null;
   };
-  connected: boolean;
+  youtubeConnected: boolean;
   onCancel: () => void;
   onRetry: () => void;
+  onPublishNow: () => void;
   busy: boolean;
 }) {
   const canCancel = canCancelPublishingJob(job.status);
   const canRetry = canRetryPublishingJob(job.status);
+  const publishCheck = canPublishYoutubeNow({
+    youtubeConnected,
+    contentStatus: job.content?.status ?? "draft",
+    permissionStatus: job.content?.sources?.permission_status,
+    platforms: [job.platform],
+    hasVideo: Boolean(job.content?.video_path),
+    jobStatus: job.status,
+    activeJobExists: job.status === "publishing",
+  });
+  const showPublishNow = job.platform === "youtube_shorts" && publishCheck.allowed;
   return (
     <article className="surface-panel flex flex-wrap justify-between gap-3 rounded-xl p-4">
       <div>
@@ -180,15 +233,40 @@ function JobCard({
         <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
           <span>{platformLabel(job.platform)}</span>
           <PublishingStatusBadge status={job.status} />
-          <span>{connected ? "Connected" : "NOT CONNECTED"}</span>
+          <span>
+            {job.platform === "youtube_shorts"
+              ? youtubeConnected
+                ? "Connected"
+                : "NOT CONNECTED"
+              : "NOT CONNECTED"}
+          </span>
         </p>
         <p className="mt-1 text-sm text-muted-foreground">
           {job.scheduled_at ? new Date(job.scheduled_at).toLocaleString() : "No scheduled time"}
         </p>
         {job.result && <p className="mt-1 text-sm">{job.result}</p>}
+        {job.remote_id && (
+          <p className="mt-1 text-sm">
+            YouTube video ID: {job.remote_id}
+            {job.remote_url ? (
+              <>
+                {" "}
+                —{" "}
+                <a className="underline" href={job.remote_url} target="_blank" rel="noreferrer">
+                  {job.remote_url}
+                </a>
+              </>
+            ) : null}
+          </p>
+        )}
         {job.error_message && <p className="mt-1 text-sm text-destructive">{job.error_message}</p>}
       </div>
       <div className="flex gap-2">
+        {showPublishNow && (
+          <Button size="sm" disabled={busy} onClick={onPublishNow}>
+            Publish Now
+          </Button>
+        )}
         {canCancel && (
           <Button size="sm" variant="secondary" disabled={busy} onClick={onCancel}>
             Cancel

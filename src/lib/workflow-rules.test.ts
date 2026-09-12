@@ -3,9 +3,11 @@ import { describe, it } from "node:test";
 import {
   blocksManualPublishedStatus,
   canCancelPublishingJob,
+  canPublishYoutubeNow,
   canRetryPublishingJob,
   canScheduleContent,
   hasSelectedPlatform,
+  isActivePublishingJob,
   isManualContentStatus,
   isPlatformOnContent,
 } from "./workflow-rules.ts";
@@ -58,5 +60,31 @@ describe("workflow rules", () => {
   it("blocks manual published status", () => {
     assert.equal(blocksManualPublishedStatus("published"), true);
     assert.equal(blocksManualPublishedStatus("approved"), false);
+  });
+
+  it("gates YouTube Publish Now on connection, approval, platform, video, and active jobs", () => {
+    const base = {
+      youtubeConnected: true,
+      contentStatus: "approved" as const,
+      platforms: ["youtube_shorts"] as Array<"youtube_shorts">,
+      hasVideo: true,
+      activeJobExists: false,
+    };
+    assert.equal(canPublishYoutubeNow(base).allowed, true);
+    assert.equal(canPublishYoutubeNow({ ...base, youtubeConnected: false }).allowed, false);
+    assert.equal(canPublishYoutubeNow({ ...base, contentStatus: "draft" }).allowed, false);
+    assert.equal(canPublishYoutubeNow({ ...base, platforms: ["tiktok"] }).allowed, false);
+    assert.equal(canPublishYoutubeNow({ ...base, hasVideo: false }).allowed, false);
+    assert.equal(canPublishYoutubeNow({ ...base, activeJobExists: true }).allowed, false);
+    assert.equal(
+      canPublishYoutubeNow({ ...base, jobStatus: "scheduled", activeJobExists: true }).allowed,
+      true,
+    );
+    assert.equal(
+      canPublishYoutubeNow({ ...base, jobStatus: "publishing", activeJobExists: true }).allowed,
+      false,
+    );
+    assert.equal(isActivePublishingJob("publishing"), true);
+    assert.equal(isActivePublishingJob("failed"), false);
   });
 });

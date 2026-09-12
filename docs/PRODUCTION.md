@@ -33,7 +33,9 @@ Set these on the server runtime only. Do not prefix them with `VITE_`. Do not pu
 
 Refresh tokens are encrypted and stored in `platform_credentials`, which is not granted to `anon` or `authenticated`. The browser only sees `platform_accounts` (`is_connected`, channel name, channel id).
 
-Application configuration (Google client exists) is separate from a user's YouTube connection. Connecting YouTube does not publish videos.
+Application configuration (Google client exists) is separate from a user's YouTube connection.
+
+YouTube Publish Now uploads privately via YouTube Data API v3 on the server. The browser never receives tokens. TikTok remains disconnected. Scheduling still creates a local job; Publish Now is the only live YouTube upload path.
 
 ## Architecture
 
@@ -57,10 +59,11 @@ Frontend rules that complement RPCs:
 - cancel applies to `scheduled` and `waiting` jobs
 - retry applies to `failed` jobs
 - cancelled jobs have no actions
+- Publish Now is server-side YouTube upload only; initial privacy is always PRIVATE
 
 ## Currently disconnected platforms
 
-YouTube OAuth connection is available when the server secrets above are set. That is account linking only. YouTube video upload and TikTok remain **not connected**. Scheduling still creates a local publishing job only. Do not present upload, OpusClip, or paid AI as live.
+YouTube OAuth connection and **Publish Now** (private upload) are available when the server secrets above are set. TikTok remains **not connected**. Scheduling still creates a local publishing job only. Do not present OpusClip or paid AI as live.
 
 ## Deployment requirements
 
@@ -73,7 +76,8 @@ If configuration is missing, `/auth` shows a configuration screen instead of cra
 
 ## Known limitations
 
-- No official YouTube or TikTok publishing (YouTube OAuth connect/disconnect only)
+- YouTube Publish Now uploads as PRIVATE only; no scheduler/worker yet
+- TikTok publishing is not connected
 - No AI clip generation
 - Analytics only shows records already stored in Supabase
 - Media delete can fail independently of content-row delete; the UI reports that without blocking the row delete

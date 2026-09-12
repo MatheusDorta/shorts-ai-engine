@@ -4,11 +4,10 @@ import { notConfigured, type PlatformService } from "./types";
 const NAME = "YouTube Shorts";
 
 /**
- * YouTube Shorts publishing stub.
+ * Browser-facing YouTube Shorts stub.
  *
- * Phase 1 added server-side OAuth connection only. This service remains a stub
- * until Phase 2 implements videos.insert. Do not treat a connected account as
- * a live publishing integration.
+ * Publish Now runs only through the server function `publishYoutubeNow`.
+ * This module must not call YouTube or handle tokens.
  */
 export const youtubeService: PlatformService = {
   platform: "youtube_shorts",

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { parseEncryptionKey } from "./crypto.ts";
-import { buildAuthorizationUrl, YOUTUBE_SCOPES } from "./google.server.ts";
+import { buildAuthorizationUrl, uploadYoutubeVideo, YOUTUBE_SCOPES } from "./google.server.ts";
 
 describe("YouTube authorization URL", () => {
   it("requests upload and readonly scopes and omits the client secret", () => {
@@ -28,5 +28,22 @@ describe("YouTube authorization URL", () => {
     assert.ok(scope.includes(YOUTUBE_SCOPES[1]));
     assert.equal(url.toString().includes("super-secret-value"), false);
     assert.ok((url.searchParams.get("state") ?? "").length > 20);
+  });
+
+  it("refuses uploads that are not private", async () => {
+    const metadata = {
+      snippet: { title: "t", description: "", tags: [], categoryId: "22" },
+      status: { privacyStatus: "public", selfDeclaredMadeForKids: false as const },
+    };
+    await assert.rejects(
+      () =>
+        uploadYoutubeVideo({
+          accessToken: "token",
+          metadata: metadata as unknown as Parameters<typeof uploadYoutubeVideo>[0]["metadata"],
+          bytes: new Uint8Array([1]),
+          contentType: "video/mp4",
+        }),
+      /must start as private/,
+    );
   });
 });

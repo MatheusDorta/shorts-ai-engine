@@ -4,6 +4,7 @@ import type {
   YouTubeConnectResult,
   YouTubeConnectionStatus,
   YouTubeDisconnectResult,
+  YouTubePublishNowResult,
 } from "./public";
 
 export const getYoutubeStatus = createServerFn({ method: "GET" })
@@ -42,5 +43,28 @@ export const disconnectYoutubeAccount = createServerFn({ method: "POST" })
       return { ok: true };
     } catch {
       return { ok: false, code: "error", message: "Could not disconnect YouTube." };
+    }
+  });
+
+export const publishYoutubeNow = createServerFn({ method: "POST" })
+  .middleware([requireYoutubeUser])
+  .validator((data: { contentId: string; jobId?: string }) => {
+    if (!data?.contentId || typeof data.contentId !== "string") {
+      throw new Error("contentId is required");
+    }
+    const contentId = data.contentId.trim();
+    if (!contentId) throw new Error("contentId is required");
+    const jobId = typeof data.jobId === "string" ? data.jobId.trim() : "";
+    return jobId ? { contentId, jobId } : { contentId };
+  })
+  .handler(async ({ context, data }): Promise<YouTubePublishNowResult> => {
+    try {
+      const { publishYoutubeNow: run } = await import("./publish.server");
+      return await run(context.userId, data);
+    } catch (error) {
+      if (error instanceof Error && error.message === "Unauthorized") {
+        return { ok: false, code: "unauthorized", message: "Unauthorized" };
+      }
+      return { ok: false, code: "error", message: "Could not publish to YouTube." };
     }
   });

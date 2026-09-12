@@ -10,6 +10,7 @@ export const YOUTUBE_SCOPES = [
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const REVOKE_URL = "https://oauth2.googleapis.com/revoke";
 const CHANNELS_URL = "https://www.googleapis.com/youtube/v3/channels";
+const UPLOAD_URL = "https://www.googleapis.com/upload/youtube/v3/videos";
 
 export type GoogleTokenResponse = {
   access_token: string;
@@ -22,6 +23,10 @@ export type GoogleTokenResponse = {
 export type YouTubeChannel = {
   id: string;
   title: string | null;
+};
+
+export type YoutubeUploadedVideo = {
+  id: string;
 };
 
 export function buildAuthorizationUrl(config: YouTubeServerConfig, userId: string): string {
@@ -89,6 +94,114 @@ export async function exchangeAuthorizationCode(
   if (typeof payload["token_type"] === "string") tokens.token_type = payload["token_type"];
   if (typeof payload["scope"] === "string") tokens.scope = payload["scope"];
   return tokens;
+}
+
+export async function refreshAccessToken(
+  config: YouTubeServerConfig,
+  refreshToken: string,
+): Promise<GoogleTokenResponse> {
+  const body = new URLSearchParams({
+    refresh_token: refreshToken,
+    client_id: config.clientId,
+    client_secret: config.clientSecret,
+    grant_type: "refresh_token",
+  });
+  const response = await fetch(TOKEN_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body,
+  });
+  const payload = await readJson(response);
+  if (!response.ok || typeof payload["access_token"] !== "string") {
+    throw new Error(googleErrorMessage(payload, "Could not refresh YouTube access"));
+  }
+  const tokens: GoogleTokenResponse = { access_token: payload["access_token"] };
+  if (typeof payload["refresh_token"] === "string") tokens.refresh_token = payload["refresh_token"];
+  if (typeof payload["expires_in"] === "number") tokens.expires_in = payload["expires_in"];
+  if (typeof payload["token_type"] === "string") tokens.token_type = payload["token_type"];
+  if (typeof payload["scope"] === "string") tokens.scope = payload["scope"];
+  return tokens;
+}
+
+export async function uploadYoutubeVideo(input: {
+  accessToken: string;
+  metadata: {
+    snippet: {
+      title: string;
+      description: string;
+      tags: string[];
+      categoryId: string;
+    };
+    status: {
+      privacyStatus: "private";
+      selfDeclaredMadeForKids: false;
+    };
+  };
+  bytes: Uint8Array;
+  contentType: string;
+}): Promise<YoutubeUploadedVideo> {
+  if (String(input.metadata.status.privacyStatus) !== "private") {
+    throw new Error("YouTube uploads must start as private.");
+  }
+  const initUrl = new URL(UPLOAD_URL);
+  initUrl.searchParams.set("uploadType", "resumable");
+  initUrl.searchParams.set("part", "snippet,status");
+  const initResponse = await fetch(initUrl, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${input.accessToken}`,
+      "Content-Type": "application/json; charset=UTF-8",
+      "X-Upload-Content-Length": String(input.bytes.byteLength),
+      "X-Upload-Content-Type": input.contentType,
+    },
+    body: JSON.stringify(input.metadata),
+  });
+  const uploadUrl = initResponse.headers.get("location");
+  if (!initResponse.ok || !uploadUrl) {
+    const payload = await readJson(initResponse);
+    throw new Error(youtubeApiError(payload, "Could not start YouTube upload"));
+  }
+
+  const total = input.bytes.byteLength;
+  const chunkSize = 8 * 1024 * 1024;
+  let offset = 0;
+  while (offset < total) {
+    const end = Math.min(offset + chunkSize, total);
+    const chunk = input.bytes.subarray(offset, end);
+    const uploadResponse = await fetch(uploadUrl, {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${input.accessToken}`,
+        "Content-Length": String(chunk.byteLength),
+        "Content-Range": `bytes ${offset}-${end - 1}/${total}`,
+        "Content-Type": input.contentType,
+      },
+      body: Buffer.from(chunk),
+    });
+    if (end < total) {
+      if (uploadResponse.status !== 308) {
+        const payload = await readJson(uploadResponse);
+        throw new Error(youtubeApiError(payload, "YouTube upload was interrupted"));
+      }
+      offset = end;
+      continue;
+    }
+    const payload = await readJson(uploadResponse);
+    if (!uploadResponse.ok || typeof payload["id"] !== "string" || !payload["id"]) {
+      throw new Error(youtubeApiError(payload, "YouTube did not confirm the upload"));
+    }
+    return { id: payload["id"] };
+  }
+  throw new Error("YouTube did not confirm the upload");
+}
+
+function youtubeApiError(body: Record<string, unknown>, fallback: string): string {
+  const error = body["error"];
+  if (error && typeof error === "object") {
+    const details = error as { message?: unknown; errors?: unknown };
+    if (typeof details.message === "string" && details.message) return details.message;
+  }
+  return googleErrorMessage(body, fallback);
 }
 
 export async function fetchYoutubeChannel(accessToken: string): Promise<YouTubeChannel> {
