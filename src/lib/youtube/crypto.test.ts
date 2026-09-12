@@ -22,8 +22,9 @@ describe("credential encryption", () => {
   it("rejects tampered ciphertext", () => {
     const payload = encryptSecret("secret", key);
     const parts = payload.split(".");
-    const tag = parts[2] ?? "";
-    parts[2] = `${tag.slice(0, -1)}${tag.endsWith("A") ? "B" : "A"}`;
+    const tag = Buffer.from(parts[2] ?? "", "base64url");
+    tag[0] = (tag[0] ?? 0) ^ 1;
+    parts[2] = tag.toString("base64url");
     assert.throws(() => decryptSecret(parts.join("."), key));
   });
 });

@@ -87,12 +87,10 @@ function readProcessEnv(name: string): string | undefined {
 }
 
 export function getSupabasePublicConfig(): ResolvedSupabasePublicConfig {
+  const viteEnv = import.meta.env as Record<string, string | undefined> | undefined;
   return resolveSupabasePublicConfig({
-    viteUrl:
-      (import.meta.env["VITE_SUPABASE_URL"] as string | undefined) ?? MANAGED_PUBLIC_URL,
-    viteKey:
-      (import.meta.env["VITE_SUPABASE_PUBLISHABLE_KEY"] as string | undefined) ??
-      MANAGED_PUBLISHABLE_KEY,
+    viteUrl: viteEnv?.["VITE_SUPABASE_URL"] ?? MANAGED_PUBLIC_URL,
+    viteKey: viteEnv?.["VITE_SUPABASE_PUBLISHABLE_KEY"] ?? MANAGED_PUBLISHABLE_KEY,
     serverUrl: readProcessEnv("SUPABASE_URL"),
     serverKey: readProcessEnv("SUPABASE_PUBLISHABLE_KEY"),
   });
