@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { formatMissingSupabaseConfig, resolveSupabasePublicConfig } from "./supabase-env.ts";
+import {
+  formatMissingSupabaseConfig,
+  getSupabasePublicConfig,
+  resolveSupabasePublicConfig,
+} from "./supabase-env.ts";
 
 describe("resolveSupabasePublicConfig", () => {
   it("prefers Vite variables over server fallbacks", () => {
@@ -51,5 +55,16 @@ describe("formatMissingSupabaseConfig", () => {
     const message = formatMissingSupabaseConfig(["VITE_SUPABASE_URL"]);
     assert.match(message, /existing Supabase project/);
     assert.doesNotMatch(message, /Lovable Cloud/);
+  });
+});
+
+describe("getSupabasePublicConfig", () => {
+  it("provides the managed public configuration when build variables are absent", () => {
+    const result = getSupabasePublicConfig();
+    assert.equal(result.ok, true);
+    if (result.ok) {
+      assert.match(result.url, /^https:\/\//);
+      assert.match(result.publishableKey, /^sb_publishable_/);
+    }
   });
 });
