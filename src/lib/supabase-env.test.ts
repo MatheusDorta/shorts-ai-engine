@@ -29,6 +29,15 @@ describe("resolveSupabasePublicConfig", () => {
     assert.equal(result.ok, true);
   });
 
+  it("fails closed when Vite and server values are absent", () => {
+    const result = resolveSupabasePublicConfig({});
+    assert.equal(result.ok, false);
+    if (!result.ok) {
+      assert.ok(result.missing.includes("VITE_SUPABASE_URL"));
+      assert.ok(result.missing.includes("VITE_SUPABASE_PUBLISHABLE_KEY"));
+    }
+  });
+
   it("rejects placeholders and missing values", () => {
     const result = resolveSupabasePublicConfig({
       viteUrl: "https://your-project.supabase.co",
@@ -59,12 +68,13 @@ describe("formatMissingSupabaseConfig", () => {
 });
 
 describe("getSupabasePublicConfig", () => {
-  it("provides the managed public configuration when build variables are absent", () => {
+  it("does not fall back to a hardcoded Lovable Cloud project", () => {
     const result = getSupabasePublicConfig();
-    assert.equal(result.ok, true);
     if (result.ok) {
-      assert.match(result.url, /^https:\/\//);
-      assert.match(result.publishableKey, /^sb_publishable_/);
+      assert.doesNotMatch(result.url, /qpaqbamlpfneblgnjakl/);
+    } else {
+      assert.ok(result.missing.includes("VITE_SUPABASE_URL"));
+      assert.ok(result.missing.includes("VITE_SUPABASE_PUBLISHABLE_KEY"));
     }
   });
 });
