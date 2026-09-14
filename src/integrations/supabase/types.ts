@@ -403,8 +403,6 @@ export type Database = {
           id: string
           platform: Database["public"]["Enums"]["platform"]
           published_at: string | null
-          remote_id: string | null
-          remote_url: string | null
           result: string | null
           scheduled_at: string | null
           status: Database["public"]["Enums"]["publishing_status"]
@@ -418,8 +416,6 @@ export type Database = {
           id?: string
           platform: Database["public"]["Enums"]["platform"]
           published_at?: string | null
-          remote_id?: string | null
-          remote_url?: string | null
           result?: string | null
           scheduled_at?: string | null
           status?: Database["public"]["Enums"]["publishing_status"]
@@ -433,8 +429,6 @@ export type Database = {
           id?: string
           platform?: Database["public"]["Enums"]["platform"]
           published_at?: string | null
-          remote_id?: string | null
-          remote_url?: string | null
           result?: string | null
           scheduled_at?: string | null
           status?: Database["public"]["Enums"]["publishing_status"]
@@ -504,8 +498,6 @@ export type Database = {
           id: string
           platform: Database["public"]["Enums"]["platform"]
           published_at: string | null
-          remote_id: string | null
-          remote_url: string | null
           result: string | null
           scheduled_at: string | null
           status: Database["public"]["Enums"]["publishing_status"]
@@ -528,8 +520,6 @@ export type Database = {
           id: string
           platform: Database["public"]["Enums"]["platform"]
           published_at: string | null
-          remote_id: string | null
-          remote_url: string | null
           result: string | null
           scheduled_at: string | null
           status: Database["public"]["Enums"]["publishing_status"]
@@ -592,8 +582,6 @@ export type Database = {
           id: string
           platform: Database["public"]["Enums"]["platform"]
           published_at: string | null
-          remote_id: string | null
-          remote_url: string | null
           result: string | null
           scheduled_at: string | null
           status: Database["public"]["Enums"]["publishing_status"]
