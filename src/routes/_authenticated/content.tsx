@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { FileVideo } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -62,7 +62,8 @@ function Content() {
   const [scheduleAt, setScheduleAt] = useState("");
 
   const sources = useQuery({
-    queryKey: ["sources"],
+    queryKey: ["sources", user?.id],
+    enabled: Boolean(user?.id),
     queryFn: async () => {
       const r = await supabase.from("sources").select("id,name,permission_status");
       if (r.error) throw r.error;
@@ -70,7 +71,8 @@ function Content() {
     },
   });
   const links = useQuery({
-    queryKey: ["affiliates"],
+    queryKey: ["affiliates", user?.id],
+    enabled: Boolean(user?.id),
     queryFn: async () => {
       const r = await supabase.from("affiliate_links").select("id,program").eq("is_active", true);
       if (r.error) throw r.error;
@@ -78,7 +80,8 @@ function Content() {
     },
   });
   const list = useQuery({
-    queryKey: ["content"],
+    queryKey: ["content", user?.id],
+    enabled: Boolean(user?.id),
     queryFn: async () => {
       const r = await supabase
         .from("content")
@@ -89,7 +92,8 @@ function Content() {
     },
   });
   const accounts = useQuery({
-    queryKey: ["platform-accounts"],
+    queryKey: ["platform-accounts", user?.id],
+    enabled: Boolean(user?.id),
     queryFn: async () => {
       const r = await supabase.from("platform_accounts").select("platform,is_connected");
       if (r.error) throw r.error;
@@ -97,13 +101,21 @@ function Content() {
     },
   });
   const jobs = useQuery({
-    queryKey: ["jobs", "publish-now-gate"],
+    queryKey: ["jobs", "publish-now-gate", user?.id],
+    enabled: Boolean(user?.id),
     queryFn: async () => {
       const r = await supabase.from("publishing_jobs").select("id,content_id,platform,status");
       if (r.error) throw r.error;
       return r.data;
     },
   });
+
+  useEffect(() => {
+    setId(null);
+    setF(blank);
+    setScheduleFor(null);
+    setScheduleAt("");
+  }, [user?.id]);
 
   const persistPaths = useMutation({
     mutationFn: async (patch: {
@@ -176,8 +188,13 @@ function Content() {
       };
       let contentId = id;
       if (id) {
-        const r = await supabase.from("content").update(p).eq("id", id);
+        const r = await supabase.from("content").update(p).eq("id", id).select("id").maybeSingle();
         if (r.error) throw r.error;
+        if (!r.data) {
+          throw Error(
+            "This content no longer belongs to your account or was deleted. Reload the page and try again.",
+          );
+        }
         const cleared = await supabase.from("content_platforms").delete().eq("content_id", id);
         if (cleared.error) throw cleared.error;
       } else {
@@ -597,7 +614,7 @@ function Content() {
             )}
           </article>
         ))}
-        {!list.isLoading && !list.data?.length && (
+        {!list.isLoading && Boolean(user?.id) && !list.data?.length && (
           <EmptyState
             icon={FileVideo}
             title="No content yet"
