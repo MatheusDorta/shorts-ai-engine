@@ -12,6 +12,11 @@ export default defineConfig({
     // nitro/vite builds from this
     server: { entry: "server" },
   },
+  // Deploy target for production hosting on Vercel. The Lovable sandbox still
+  // forces cloudflare-module for its own builds, so Lovable keeps working.
+  nitro: {
+    preset: "vercel",
+  },
   vite: {
     server: {
       allowedHosts: [".monkeycode-ai.live"],
