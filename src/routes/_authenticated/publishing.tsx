@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
 import { toast } from "sonner";
 import { Send } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -20,7 +21,7 @@ import {
   canPublishYoutubeNow,
   canRetryPublishingJob,
 } from "@/lib/workflow-rules";
-import { publishYoutubeNow } from "@/lib/youtube/youtube.functions";
+import { publishYoutubeNow, syncYoutubeScheduledJobs } from "@/lib/youtube/youtube.functions";
 
 export const Route = createFileRoute("/_authenticated/publishing")({ component: Publishing });
 
@@ -75,6 +76,23 @@ function Publishing() {
     qc.invalidateQueries({ queryKey: ["dashboard"] });
   };
 
+  useEffect(() => {
+    let active = true;
+    syncYoutubeScheduledJobs()
+      .then((result) => {
+        if (!active || !result.updated) return;
+        qc.invalidateQueries({ queryKey: ["jobs"] });
+        qc.invalidateQueries({ queryKey: ["content"] });
+        qc.invalidateQueries({ queryKey: ["dashboard"] });
+      })
+      .catch(() => {
+        // Reconciliation is best-effort; the queue still renders from stored jobs.
+      });
+    return () => {
+      active = false;
+    };
+  }, [qc]);
+
   const cancel = useMutation({
     mutationFn: async (id: string) => cancelPublishingJob(id),
     onSuccess: () => {
@@ -102,7 +120,7 @@ function Publishing() {
         toast.error("Could not publish to YouTube", { description: result.message });
         return;
       }
-      toast.success("Published privately to YouTube", {
+      toast.success("Published publicly to YouTube", {
         description: `${result.videoId} — ${result.videoUrl}`,
       });
     },
@@ -214,7 +232,7 @@ function JobCard({
   onPublishNow: () => void;
   busy: boolean;
 }) {
-  const canCancel = canCancelPublishingJob(job.status);
+  const canCancel = canCancelPublishingJob(job.status) && !job.remote_id;
   const canRetry = canRetryPublishingJob(job.status);
   const publishCheck = canPublishYoutubeNow({
     youtubeConnected,
@@ -225,7 +243,8 @@ function JobCard({
     jobStatus: job.status,
     activeJobExists: job.status === "publishing",
   });
-  const showPublishNow = job.platform === "youtube_shorts" && publishCheck.allowed;
+  const showPublishNow =
+    job.platform === "youtube_shorts" && !job.remote_id && publishCheck.allowed;
   return (
     <article className="surface-panel flex flex-wrap justify-between gap-3 rounded-xl p-4">
       <div>
@@ -244,6 +263,11 @@ function JobCard({
         <p className="mt-1 text-sm text-muted-foreground">
           {job.scheduled_at ? new Date(job.scheduled_at).toLocaleString() : "No scheduled time"}
         </p>
+        {job.status === "scheduled" && job.remote_id && (
+          <p className="mt-1 text-sm text-muted-foreground">
+            Uploaded to YouTube. It will publish automatically at the scheduled time.
+          </p>
+        )}
         {job.result && <p className="mt-1 text-sm">{job.result}</p>}
         {job.remote_id && (
           <p className="mt-1 text-sm">
@@ -264,7 +288,7 @@ function JobCard({
       <div className="flex gap-2">
         {showPublishNow && (
           <Button size="sm" disabled={busy} onClick={onPublishNow}>
-            Publish Now
+            Publish Now (Public)
           </Button>
         )}
         {canCancel && (

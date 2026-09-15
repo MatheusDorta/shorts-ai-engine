@@ -18,6 +18,17 @@ export type YouTubePublishNowResult =
       jobId: string;
       videoId: string;
       videoUrl: string;
+      privacyStatus: "public";
+    }
+  | { ok: false; code: "unauthorized" | "not_configured" | "error"; message: string };
+
+export type YouTubeScheduleResult =
+  | {
+      ok: true;
+      jobId: string;
+      videoId: string;
+      videoUrl: string;
       privacyStatus: "private";
+      publishAt: string;
     }
   | { ok: false; code: "unauthorized" | "not_configured" | "error"; message: string };

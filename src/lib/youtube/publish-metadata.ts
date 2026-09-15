@@ -1,4 +1,4 @@
-export const YOUTUBE_PRIVACY_STATUS = "private" as const;
+export type YoutubePrivacyStatus = "private" | "public";
 
 const TITLE_MAX = 100;
 const DESCRIPTION_MAX = 5000;
@@ -13,8 +13,9 @@ export type YoutubeVideoMetadata = {
     categoryId: string;
   };
   status: {
-    privacyStatus: typeof YOUTUBE_PRIVACY_STATUS;
+    privacyStatus: YoutubePrivacyStatus;
     selfDeclaredMadeForKids: false;
+    publishAt?: string;
   };
 };
 
@@ -46,7 +47,16 @@ export function buildYoutubeVideoMetadata(input: {
   title: string;
   description?: string | null;
   hashtags?: string[] | null;
+  privacyStatus: YoutubePrivacyStatus;
+  publishAt?: string | null;
 }): YoutubeVideoMetadata {
+  const status: YoutubeVideoMetadata["status"] = {
+    privacyStatus: input.privacyStatus,
+    selfDeclaredMadeForKids: false,
+  };
+  if (input.privacyStatus === "private" && input.publishAt) {
+    status.publishAt = input.publishAt;
+  }
   return {
     snippet: {
       title: clip(input.title, TITLE_MAX) || "Untitled",
@@ -54,9 +64,6 @@ export function buildYoutubeVideoMetadata(input: {
       tags: buildTags(input.hashtags),
       categoryId: "22",
     },
-    status: {
-      privacyStatus: YOUTUBE_PRIVACY_STATUS,
-      selfDeclaredMadeForKids: false,
-    },
+    status,
   };
 }

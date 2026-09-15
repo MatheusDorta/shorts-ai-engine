@@ -29,9 +29,33 @@ import {
   isPlatformOnContent,
 } from "@/lib/workflow-rules";
 import { deleteMedia } from "@/lib/media-upload";
-import { publishYoutubeNow } from "@/lib/youtube/youtube.functions";
+import { publishYoutubeNow, scheduleYoutubePublish } from "@/lib/youtube/youtube.functions";
 
 export const Route = createFileRoute("/_authenticated/content")({ component: Content });
+
+function parseDatetimeLocal(value: string): Date {
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/.exec(value);
+  if (!match) throw Error("Select a valid date and time.");
+  const date = new Date(
+    Number(match[1]),
+    Number(match[2]) - 1,
+    Number(match[3]),
+    Number(match[4]),
+    Number(match[5]),
+    Number(match[6] ?? "0"),
+  );
+  if (Number.isNaN(date.getTime())) throw Error("Select a valid date and time.");
+  return date;
+}
+
+function toDatetimeLocalValue(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(
+    date.getHours(),
+  )}:${pad(date.getMinutes())}`;
+}
 
 const blank = {
   title: "",
@@ -275,15 +299,32 @@ function Content() {
       if (!item || !isPlatformOnContent(item.content_platforms, schedulePlatform)) {
         throw Error("Selected platform is not part of this content.");
       }
-      return scheduleContent(scheduleFor, schedulePlatform, new Date(scheduleAt).toISOString());
+      const scheduledAt = parseDatetimeLocal(scheduleAt).toISOString();
+      if (schedulePlatform === "youtube_shorts") {
+        const result = await scheduleYoutubePublish({
+          data: { contentId: scheduleFor, scheduledAt },
+        });
+        if (!result.ok) throw Error(result.message);
+        return { youtube: true, publishAt: result.publishAt };
+      }
+      await scheduleContent(scheduleFor, schedulePlatform, scheduledAt);
+      return { youtube: false, publishAt: scheduledAt };
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       qc.invalidateQueries({ queryKey: ["content"] });
       qc.invalidateQueries({ queryKey: ["jobs"] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
       setScheduleFor(null);
       setScheduleAt("");
-      toast.success("Locally scheduled. Use Publish Now to upload privately to YouTube.");
+      if (result.youtube) {
+        toast.success("Scheduled on YouTube", {
+          description: `Uploaded privately. YouTube publishes it automatically at ${new Date(
+            result.publishAt,
+          ).toLocaleString()}.`,
+        });
+        return;
+      }
+      toast.success("Locally scheduled. Use Publish Now to upload to YouTube.");
     },
     onError: (e) => toast.error("Could not schedule content", { description: e.message }),
   });
@@ -302,7 +343,7 @@ function Content() {
         toast.error("Could not publish to YouTube", { description: result.message });
         return;
       }
-      toast.success("Published privately to YouTube", {
+      toast.success("Published publicly to YouTube", {
         description: `${result.videoId} — ${result.videoUrl}`,
       });
     },
@@ -527,8 +568,9 @@ function Content() {
                   size="sm"
                   disabled={publishNow.isPending}
                   onClick={() => publishNow.mutate(x.id)}
+                  title="Uploads immediately and publishes publicly on YouTube"
                 >
-                  Publish Now
+                  Publish Now (Public)
                 </Button>
               )}
               {canScheduleContent({
@@ -544,7 +586,7 @@ function Content() {
                     setScheduleFor(x.id);
                     const firstPlatform = x.content_platforms[0]?.platform;
                     if (firstPlatform) setSchedulePlatform(firstPlatform);
-                    setScheduleAt(x.scheduled_at ? x.scheduled_at.slice(0, 16) : "");
+                    setScheduleAt(x.scheduled_at ? toDatetimeLocalValue(x.scheduled_at) : "");
                   }}
                 >
                   Schedule
@@ -568,7 +610,8 @@ function Content() {
             {scheduleFor === x.id && (
               <div className="w-full space-y-2 rounded-md border border-border p-3">
                 <p className="text-sm text-muted-foreground">
-                  Creates a local publishing job. Use Publish Now to upload privately to YouTube.
+                  YouTube Shorts uploads privately now and YouTube publishes it automatically at the
+                  scheduled time. TikTok only records a local job.
                 </p>
                 {x.content_platforms.length ? (
                   <select
@@ -589,6 +632,7 @@ function Content() {
                 )}
                 <Input
                   type="datetime-local"
+                  step="60"
                   value={scheduleAt}
                   onChange={(e) => setScheduleAt(e.target.value)}
                 />

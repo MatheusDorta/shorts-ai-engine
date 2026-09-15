@@ -10,6 +10,7 @@ export const YOUTUBE_SCOPES = [
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const REVOKE_URL = "https://oauth2.googleapis.com/revoke";
 const CHANNELS_URL = "https://www.googleapis.com/youtube/v3/channels";
+const VIDEOS_URL = "https://www.googleapis.com/youtube/v3/videos";
 const UPLOAD_URL = "https://www.googleapis.com/upload/youtube/v3/videos";
 
 export type GoogleTokenResponse = {
@@ -27,6 +28,10 @@ export type YouTubeChannel = {
 
 export type YoutubeUploadedVideo = {
   id: string;
+};
+
+export type YoutubeVideoStatus = {
+  privacyStatus: string | null;
 };
 
 export function buildAuthorizationUrl(config: YouTubeServerConfig, userId: string): string {
@@ -133,15 +138,20 @@ export async function uploadYoutubeVideo(input: {
       categoryId: string;
     };
     status: {
-      privacyStatus: "private";
+      privacyStatus: "private" | "public";
       selfDeclaredMadeForKids: false;
+      publishAt?: string;
     };
   };
   bytes: Uint8Array;
   contentType: string;
 }): Promise<YoutubeUploadedVideo> {
-  if (String(input.metadata.status.privacyStatus) !== "private") {
-    throw new Error("YouTube uploads must start as private.");
+  const privacyStatus = input.metadata.status.privacyStatus;
+  if (privacyStatus !== "private" && privacyStatus !== "public") {
+    throw new Error("YouTube uploads must be private or public.");
+  }
+  if (privacyStatus === "public" && input.metadata.status.publishAt) {
+    throw new Error("A public YouTube upload cannot set publishAt.");
   }
   const initUrl = new URL(UPLOAD_URL);
   initUrl.searchParams.set("uploadType", "resumable");
@@ -228,6 +238,36 @@ export async function fetchYoutubeChannel(accessToken: string): Promise<YouTubeC
     id: item.id,
     title: typeof item.snippet?.title === "string" ? item.snippet.title : null,
   };
+}
+
+export async function fetchYoutubeVideoStatuses(
+  accessToken: string,
+  videoIds: string[],
+): Promise<Map<string, YoutubeVideoStatus>> {
+  const unique = [...new Set(videoIds.filter(Boolean))];
+  if (!unique.length) return new Map();
+  const url = new URL(VIDEOS_URL);
+  url.searchParams.set("part", "status");
+  url.searchParams.set("id", unique.join(","));
+  const response = await fetch(url, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  const payload = await readJson(response);
+  if (!response.ok) {
+    throw new Error(googleErrorMessage(payload, "Could not read YouTube video status"));
+  }
+  const items = Array.isArray(payload["items"]) ? payload["items"] : [];
+  const statuses = new Map<string, YoutubeVideoStatus>();
+  for (const raw of items) {
+    if (!raw || typeof raw !== "object") continue;
+    const item = raw as { id?: unknown; status?: { privacyStatus?: unknown } };
+    if (typeof item.id !== "string" || !item.id) continue;
+    statuses.set(item.id, {
+      privacyStatus:
+        typeof item.status?.privacyStatus === "string" ? item.status.privacyStatus : null,
+    });
+  }
+  return statuses;
 }
 
 export async function revokeGoogleToken(token: string): Promise<void> {
